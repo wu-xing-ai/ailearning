@@ -16,3 +16,4 @@ redis==5.0.1
 pyjwt==2.8.0
 bcrypt==4.1.2
 SQLAlchemy==2.0.25
+pymysql==1.1.0

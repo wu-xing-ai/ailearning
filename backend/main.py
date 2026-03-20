@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict
@@ -13,7 +13,10 @@ sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
 from ollama_service import OllamaService
 from core import OllamaConfig, StreamHandler
+from core.database import get_db, init_db
 from ai_services import factory, AIServiceFactory
+from services.document_processor import DocumentProcessor
+from models.document import Document as DocumentModel
 
 app = FastAPI(
     title="武汉外国语学校智能学习平台API",
@@ -52,9 +55,18 @@ class ChatSession(BaseModel):
     created_at: datetime
     updated_at: datetime
 
-# 内存存储
-documents_db = {}
+# 内存存储（仅用于聊天会话等临时数据）
 chat_sessions = {}
+
+# API密钥存储
+api_keys_storage = {}
+
+# 启动时初始化数据库
+@app.on_event("startup")
+async def startup_event():
+    """应用启动时初始化数据库"""
+    init_db()
+    print("数据库初始化完成")
 
 # 初始化Ollama服务
 ollama_config = OllamaConfig()
@@ -75,24 +87,124 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
 @app.post("/api/documents")
-async def upload_document(doc: dict):
+async def upload_document(file: UploadFile = File(...)):
     """上传文档到知识库"""
-    doc_id = str(uuid.uuid4())
-    document = Document(
-        id=doc_id,
-        filename=doc['filename'],
-        file_type=doc['file_type'],
-        content=doc['content'],
-        created_at=datetime.now(),
-        processed=False
-    )
-    documents_db[doc_id] = document.dict()
-    return {"id": doc_id, "status": "uploaded"}
+    from sqlalchemy.orm import Session
+
+    # 1. 验证文件类型
+    file_type = DocumentProcessor.get_file_type(file.filename)
+    if file_type == 'unknown':
+        raise HTTPException(status_code=400, detail="不支持的文件格式，仅支持 PDF、DOCX、TXT、XLSX、MD")
+
+    # 2. 读取文件内容
+    content_bytes = await file.read()
+
+    # 3. 提取文本内容
+    try:
+        text_content, file_type_name = DocumentProcessor.extract_content(
+            content_bytes, file_type, file.filename
+        )
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"文件处理失败: {str(e)}")
+
+    # 4. 保存到数据库
+    db = next(get_db())
+    try:
+        doc_id = str(uuid.uuid4())
+        document = DocumentModel(
+            id=doc_id,
+            filename=file.filename,
+            file_type=file_type_name,
+            content=text_content,
+            processed=False
+        )
+        db.add(document)
+        db.commit()
+    finally:
+        db.close()
+
+    return {
+        "id": doc_id,
+        "status": "uploaded",
+        "filename": file.filename,
+        "file_type": file_type_name
+    }
 
 @app.get("/api/documents")
 async def get_documents():
     """获取所有文档"""
-    return list(documents_db.values())
+    from sqlalchemy.orm import Session
+
+    db = next(get_db())
+    try:
+        documents = db.query(DocumentModel).order_by(DocumentModel.created_at.desc()).all()
+        return [doc.to_dict() for doc in documents]
+    finally:
+        db.close()
+
+@app.get("/api/documents/search")
+async def search_documents(q: str = Query(..., description="搜索关键词")):
+    """搜索文档"""
+    from sqlalchemy.orm import Session
+
+    if not q or not q.strip():
+        return []
+
+    db = next(get_db())
+    try:
+        search_term = f"%{q.strip()}%"
+        documents = db.query(DocumentModel).filter(
+            (DocumentModel.filename.like(search_term)) |
+            (DocumentModel.content.like(search_term))
+        ).order_by(DocumentModel.created_at.desc()).all()
+
+        results = []
+        for doc in documents:
+            # 提取内容摘要（包含关键词的前后100字符）
+            content = doc.content or ""
+            keyword = q.strip().lower()
+            content_lower = content.lower()
+            idx = content_lower.find(keyword)
+
+            if idx != -1:
+                start = max(0, idx - 50)
+                end = min(len(content), idx + len(keyword) + 50)
+                snippet = content[start:end]
+                if start > 0:
+                    snippet = "..." + snippet
+                if end < len(content):
+                    snippet = snippet + "..."
+            else:
+                snippet = content[:100] + "..." if len(content) > 100 else content
+
+            results.append({
+                "id": doc.id,
+                "filename": doc.filename,
+                "file_type": doc.file_type,
+                "snippet": snippet,
+                "processed": doc.processed,
+                "created_at": doc.created_at.isoformat() if doc.created_at else None
+            })
+
+        return results
+    finally:
+        db.close()
+
+@app.delete("/api/documents/{doc_id}")
+async def delete_document(doc_id: str):
+    """删除文档"""
+    from sqlalchemy.orm import Session
+
+    db = next(get_db())
+    try:
+        document = db.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        db.delete(document)
+        db.commit()
+        return {"status": "deleted", "id": doc_id}
+    finally:
+        db.close()
 
 @app.post("/api/chat/session")
 async def create_chat_session():
@@ -175,8 +287,8 @@ async def chat_with_ai(request: dict):
             )
 
         if stream:
-            # 流式响应
-            generator = service.chat_completion(prompt, stream=True)
+            # 流式响应 - 需要await来获取async generator
+            generator = await service.chat_completion(prompt, stream=True)
             return StreamHandler.create_stream(generator)
         else:
             # 非流式响应
@@ -390,12 +502,21 @@ async def get_supported_providers():
 @app.post("/api/knowledge/process")
 async def process_knowledge(doc_id: str = Query(..., description="文档ID")):
     """处理知识库文档"""
-    if doc_id not in documents_db:
-        raise HTTPException(status_code=404, detail="Document not found")
+    from sqlalchemy.orm import Session
 
-    # 模拟文档处理
-    documents_db[doc_id]['processed'] = True
-    return {"status": "processing", "document_id": doc_id}
+    db = next(get_db())
+    try:
+        document = db.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+
+        # 标记为已处理
+        document.processed = True
+        db.commit()
+
+        return {"status": "processed", "document_id": doc_id}
+    finally:
+        db.close()
 
 if __name__ == "__main__":
     import uvicorn

@@ -9,16 +9,17 @@
 
     <div class="upload-area">
       <el-upload
-        v-model:file-list="fileList"
+        ref="uploadRef"
         class="upload-demo"
-        action="/api/documents"
+        action="#"
         :auto-upload="false"
         drag
         multiple
-        :on-preview="handlePreview"
+        :on-change="handleFileChange"
         :on-remove="handleRemove"
-        :on-exceed="handleExceed"
         :file-list="fileList"
+        :limit="20"
+        accept=".pdf,.docx,.txt,.xlsx,.md"
       >
         <el-icon class="el-icon--upload"><upload-filled /></el-icon>
         <div class="el-upload__text">
@@ -26,117 +27,150 @@
         </div>
         <template #tip>
           <div class="el-upload__tip">
-            支持 PDF、DOCX、XLSX、TXT、Markdown 等格式，单个文件最大 50MB
+            支持 PDF、DOCX、XLSX、TXT、MD 格式，单个文件最大 50MB
           </div>
         </template>
       </el-upload>
     </div>
 
     <div class="upload-actions">
-      <el-button type="primary" @click="submitUpload">开始上传</el-button>
-      <el-button @click="handleBatchUpload">批量上传</el-button>
+      <el-button type="primary" @click="submitUpload" :loading="uploading">开始上传</el-button>
+      <el-button @click="refreshHistory" :loading="loading">刷新历史</el-button>
     </div>
 
     <div class="upload-history">
       <h3>上传历史</h3>
-      <el-table :data="uploadHistory" style="width: 100%">
-        <el-table-column prop="filename" label="文件名" width="200"></el-table-column>
-        <el-table-column prop="size" label="大小" width="80"></el-table-column>
+      <el-table :data="uploadHistory" style="width: 100%" v-loading="loading">
+        <el-table-column prop="filename" label="文件名" width="250"></el-table-column>
+        <el-table-column prop="file_type" label="类型" width="80"></el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.status === 'success' ? 'success' : 'danger'">
-              {{ row.status }}
+            <el-tag :type="row.processed ? 'success' : 'warning'">
+              {{ row.processed ? '已处理' : '待处理' }}
             </el-tag>
           </template>
         </el-table-column>
-        <el-table-column prop="upload_time" label="上传时间" width="180"></el-table-column>
+        <el-table-column prop="created_at" label="上传时间" width="180"></el-table-column>
+        <el-table-column label="操作" width="100">
+          <template #default="{ row }">
+            <el-button size="small" type="danger" @click="handleDelete(row.id)">删除</el-button>
+          </template>
+        </el-table-column>
       </el-table>
+
+      <el-empty v-if="!loading && uploadHistory.length === 0" description="暂无上传记录" />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
+import api from '@/utils/api'
 
 const fileList = ref([])
-const uploadHistory = ref([
-  {
-    filename: '高一数学教材.pdf',
-    size: '25.6 MB',
-    status: 'success',
-    upload_time: '2024-01-15 14:30:22'
-  },
-  {
-    filename: '英语语法总结.docx',
-    size: '3.2 MB',
-    status: 'success',
-    upload_time: '2024-01-16 09:15:33'
-  },
-  {
-    filename: '物理实验指南.xlsx',
-    size: '1.8 MB',
-    status: 'failed',
-    upload_time: '2024-01-17 16:45:12'
+const uploadHistory = ref([])
+const loading = ref(false)
+const uploading = ref(false)
+
+// 格式化日期时间
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return ''
+  const date = new Date(dateStr)
+  return date.toLocaleString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  })
+}
+
+// 加载上传历史
+const loadHistory = async () => {
+  loading.value = true
+  try {
+    const result = await api.getDocuments()
+    uploadHistory.value = result.map(doc => ({
+      ...doc,
+      created_at: formatDateTime(doc.created_at)
+    }))
+  } catch (error) {
+    ElMessage.error('加载上传历史失败: ' + error.message)
+  } finally {
+    loading.value = false
   }
-])
-
-const handleRemove = (uploadFile, uploadFiles) => {
-  console.log(uploadFiles)
 }
 
-const handlePreview = (uploadFile) => {
-  console.log(uploadFile)
+// 刷新历史
+const refreshHistory = async () => {
+  await loadHistory()
+  ElMessage.success('刷新成功')
 }
 
-const handleExceed = (files, uploadFiles) => {
-  ElMessage.warning(`最多只能选择 ${files.length} 个文件`)
+// 文件选择变化
+const handleFileChange = (file, files) => {
+  fileList.value = files
 }
 
+// 文件移除
+const handleRemove = (file, files) => {
+  fileList.value = files
+}
+
+// 提交上传
 const submitUpload = async () => {
   if (fileList.value.length === 0) {
     ElMessage.warning('请选择要上传的文件')
     return
   }
 
-  ElMessage.info('开始上传文件...')
+  uploading.value = true
+  try {
+    const results = await api.uploadDocuments(fileList.value)
 
-  // 模拟上传过程
-  setTimeout(() => {
-    fileList.value.forEach(file => {
-      const historyItem = {
-        filename: file.name,
-        size: formatFileSize(file.size),
-        status: 'success',
-        upload_time: new Date().toLocaleString()
-      }
-      uploadHistory.value.unshift(historyItem)
-    })
+    const successCount = results.filter(r => r.success).length
+    const failCount = results.filter(r => !r.success).length
+
+    if (successCount > 0) {
+      ElMessage.success(`成功上传 ${successCount} 个文件`)
+    }
+    if (failCount > 0) {
+      ElMessage.warning(`${failCount} 个文件上传失败`)
+    }
+
     fileList.value = []
-    ElMessage.success('文件上传成功！')
-  }, 1500)
+    await loadHistory()  // 刷新上传历史
+  } catch (error) {
+    ElMessage.error('上传失败: ' + error.message)
+  } finally {
+    uploading.value = false
+  }
 }
 
-const handleBatchUpload = () => {
-  ElMessageBox.confirm(
-    '确定要批量上传所有选中的文件吗？',
-    '批量上传',
-    {
+// 删除文档
+const handleDelete = async (docId) => {
+  try {
+    await ElMessageBox.confirm('确定要删除这个文档吗？', '确认删除', {
       confirmButtonText: '确定',
       cancelButtonText: '取消',
       type: 'warning'
+    })
+
+    await api.deleteDocument(docId)
+    ElMessage.success('删除成功')
+    await loadHistory()
+  } catch (error) {
+    if (error !== 'cancel') {
+      ElMessage.error('删除失败: ' + error.message)
     }
-  ).then(() => {
-    ElMessage.success('批量上传开始')
-  })
+  }
 }
 
-const formatFileSize = (size) => {
-  if (size < 1024) return size + ' B'
-  if (size < 1024 * 1024) return (size / 1024).toFixed(1) + ' KB'
-  return (size / (1024 * 1024)).toFixed(1) + ' MB'
-}
+onMounted(() => {
+  loadHistory()
+})
 </script>
 
 <style scoped>

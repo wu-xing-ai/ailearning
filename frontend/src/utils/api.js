@@ -76,6 +76,59 @@ const api = {
 
   async resetContext() {
     return this.post('/api/ai/reset')
+  },
+
+  // 文档上传 - 单文件
+  async uploadDocument(file) {
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch('/api/documents', {
+      method: 'POST',
+      body: formData
+      // 注意：不要设置 Content-Type，让浏览器自动设置 multipart/form-data
+    })
+
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.detail || '上传失败')
+    }
+
+    return result
+  },
+
+  // 批量上传文档
+  async uploadDocuments(files) {
+    const results = []
+    for (const file of files) {
+      try {
+        const result = await this.uploadDocument(file.raw || file)
+        results.push({ success: true, ...result })
+      } catch (error) {
+        results.push({ success: false, filename: file.name, error: error.message })
+      }
+    }
+    return results
+  },
+
+  // 获取文档列表
+  async getDocuments() {
+    return this.get('/api/documents')
+  },
+
+  // 删除文档
+  async deleteDocument(docId) {
+    const response = await fetch(`/api/documents/${docId}`, {
+      method: 'DELETE'
+    })
+    const result = await response.json()
+
+    if (!response.ok) {
+      throw new Error(result.detail || '删除失败')
+    }
+
+    return result
   }
 }
 

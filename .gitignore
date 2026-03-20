@@ -1,0 +1,11 @@
+# Python 缓存
+__pycache__/
+*.pyc
+
+# 前端依赖和编译产物
+node_modules/
+dist/
+.vite/
+
+# 环境变量和敏感 Key
+.env

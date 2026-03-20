@@ -162,7 +162,7 @@ const currentModels = computed(() => {
   if (models.length === 0) {
     // 返回默认模型
     const defaults = {
-      ollama: [{ value: 'llama3.2', label: 'Llama 3.2' }],
+      ollama: [{ value: 'qwen2.5:latest', label: 'Qwen 2.5' }],
       openai: [{ value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' }],
       anthropic: [{ value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' }],
       zhipu: [{ value: 'glm-4', label: 'GLM-4' }],

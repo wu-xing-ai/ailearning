@@ -10,7 +10,7 @@ class OllamaConfig:
     """Ollama配置管理类"""
 
     DEFAULT_CONFIG = {
-        "model": "llama3.2",
+        "model": "qwen2.5:latest",
         "base_url": "http://localhost:11434",
         "temperature": 0.7,
         "max_tokens": 2048
