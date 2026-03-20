@@ -1,0 +1,21 @@
+{
+  "provider": "ollama",
+  "model": "qwen2.5",
+  "base_url": "http://localhost:11434",
+  "api_keys": {
+    "openai": "",
+    "anthropic": "",
+    "zhipu": "",
+    "qwen": "",
+    "siliconflow": "",
+    "custom": ""
+  },
+  "custom_models": [
+    {
+      "name": "Qwen/Qwen2.5-7B-Instruct",
+      "provider": "siliconflow",
+      "api_url": "https://api.siliconflow.cn/v1",
+      "api_key": "sk-ebfrhznkzfmpprbyzhhnusvhxnfcqvhgiobjwrdspdpdzpze"
+    }
+  ]
+}
