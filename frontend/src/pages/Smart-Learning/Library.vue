@@ -197,25 +197,88 @@ onMounted(() => {
 
 <style scoped>
 .library-container {
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  padding: 24px;
+  background: linear-gradient(180deg, #FFFEF7 0%, #FFF9E8 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(139, 90, 43, 0.08);
+  min-height: calc(100vh - 140px);
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.header h2 {
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
+  color: #3D2914;
+  font-weight: 600;
+}
+
+.header .actions {
+  display: flex;
+  gap: 12px;
 }
 
 .document-list {
   margin-top: 20px;
 }
 
+/* 表格样式 */
+.document-list :deep(.el-table) {
+  background: transparent;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.document-list :deep(.el-table th.el-table__cell) {
+  background: linear-gradient(135deg, #FFFEF7 0%, #FFF5E6 100%);
+  color: #3D2914;
+  font-weight: 600;
+}
+
+.document-list :deep(.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell) {
+  background-color: rgba(212, 165, 116, 0.08);
+}
+
+/* 删除按钮保持危险色 */
+.document-list :deep(.el-button--danger) {
+  background: #F56C6C;
+  border-color: #F56C6C;
+}
+
 .dialog-footer {
   text-align: right;
   padding-top: 20px;
+}
+
+/* 上传对话框样式 */
+:deep(.el-dialog) {
+  border-radius: 16px;
+}
+
+:deep(.el-dialog__header) {
+  background: linear-gradient(135deg, #FFFEF7 0%, #FFF9E8 100%);
+}
+
+:deep(.el-dialog__title) {
+  color: #3D2914;
+  font-weight: 600;
+}
+
+:deep(.el-upload-dragger) {
+  background: #FFFEF7;
+  border: 2px dashed rgba(139, 90, 43, 0.2);
+  border-radius: 12px;
+}
+
+:deep(.el-upload-dragger:hover) {
+  border-color: #D4A574;
+}
+
+:deep(.el-icon--upload) {
+  color: #D4A574;
 }
 </style>

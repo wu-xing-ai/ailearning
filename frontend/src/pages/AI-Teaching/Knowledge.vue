@@ -133,30 +133,46 @@ const shareKnowledge = () => {
 
 <style scoped>
 .knowledge-container {
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  padding: 24px;
+  background: linear-gradient(180deg, #FFFEF7 0%, #FFF9E8 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(139, 90, 43, 0.08);
+  min-height: calc(100vh - 140px);
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.header h2 {
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
+  color: #3D2914;
+  font-weight: 600;
+  margin: 0;
+}
+
+.header-actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
 }
 
 .knowledge-content {
   display: flex;
-  gap: 20px;
+  gap: 24px;
   height: 500px;
 }
 
 .knowledge-tree {
   width: 300px;
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  padding: 10px;
+  border: 1px solid rgba(139, 90, 43, 0.1);
+  border-radius: 12px;
+  padding: 16px;
+  background: white;
+  box-shadow: 0 2px 12px rgba(139, 90, 43, 0.05);
 }
 
 .knowledge-detail {
@@ -169,24 +185,75 @@ const shareKnowledge = () => {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
+  margin-bottom: 16px;
+}
+
+.detail-header h3 {
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
+  color: #3D2914;
+  font-size: 18px;
+  margin: 0;
 }
 
 .card-header {
-  font-weight: bold;
+  font-weight: 600;
   font-size: 14px;
-  margin-bottom: 10px;
+  margin-bottom: 12px;
+  color: #3D2914;
 }
 
 .content-preview {
-  color: #666;
-  line-height: 1.6;
+  color: #5D4E37;
+  line-height: 1.8;
   max-height: 300px;
   overflow-y: auto;
 }
 
 .card-footer {
-  margin-top: 15px;
+  margin-top: 16px;
   text-align: right;
+}
+
+/* 卡片样式 */
+:deep(.el-card) {
+  border-radius: 12px;
+  border: 1px solid rgba(139, 90, 43, 0.1);
+  box-shadow: 0 2px 12px rgba(139, 90, 43, 0.05);
+}
+
+:deep(.el-card__header) {
+  background: linear-gradient(135deg, #FFFEF7 0%, #FFF5E6 100%);
+  border-bottom: 1px solid rgba(139, 90, 43, 0.1);
+}
+
+/* 按钮组样式 */
+:deep(.el-button-group .el-button) {
+  border-color: rgba(139, 90, 43, 0.2);
+  color: #5D4E37;
+}
+
+:deep(.el-button-group .el-button:hover) {
+  background: rgba(212, 165, 116, 0.1);
+  border-color: #D4A574;
+  color: #D4A574;
+}
+
+/* 树形组件样式 */
+:deep(.el-tree-node__content:hover) {
+  background-color: rgba(212, 165, 116, 0.1);
+}
+
+:deep(.el-tree-node.is-current > .el-tree-node__content) {
+  background-color: rgba(212, 165, 116, 0.15);
+}
+
+/* Select 下拉框样式 */
+.header-actions :deep(.el-input__wrapper) {
+  background: #FFFEF7;
+  border: 1px solid rgba(139, 90, 43, 0.15);
+}
+
+.header-actions :deep(.el-input__wrapper:hover) {
+  border-color: #D4A574;
 }
 </style>

@@ -111,43 +111,55 @@ const formatProgress = (percentage) => {
 
 <style scoped>
 .structure-container {
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  padding: 24px;
+  background: linear-gradient(180deg, #FFFEF7 0%, #FFF9E8 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(139, 90, 43, 0.08);
+  min-height: calc(100vh - 140px);
 }
 
 .header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.header h2 {
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
+  color: #3D2914;
+  font-weight: 600;
+  margin: 0;
 }
 
 .structure-content {
   display: flex;
-  gap: 20px;
+  gap: 24px;
 }
 
 .knowledge-tree {
   flex: 1;
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  padding: 15px;
+  border: 1px solid rgba(139, 90, 43, 0.1);
+  border-radius: 12px;
+  padding: 20px;
+  background: white;
+  box-shadow: 0 2px 12px rgba(139, 90, 43, 0.05);
 }
 
 .tree-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 15px;
-  padding-bottom: 10px;
-  border-bottom: 1px solid #ebeef5;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(139, 90, 43, 0.1);
 }
 
 .tree-title {
   font-size: 16px;
-  font-weight: bold;
+  font-weight: 600;
+  color: #3D2914;
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
 }
 
 .tree-content {
@@ -156,38 +168,71 @@ const formatProgress = (percentage) => {
 }
 
 .tree-node {
-  margin-bottom: 10px;
+  margin-bottom: 8px;
 }
 
 .node-header {
   display: flex;
   align-items: center;
-  padding: 8px;
-  border-radius: 4px;
+  padding: 10px 12px;
+  border-radius: 8px;
   cursor: pointer;
-  transition: background 0.2s;
+  transition: all 0.2s ease;
+  color: #5D4E37;
 }
 
 .node-header:hover {
-  background: #f5f7fa;
+  background: rgba(212, 165, 116, 0.1);
+}
+
+.node-header :deep(.el-icon) {
+  color: #D4A574;
+  margin-right: 8px;
 }
 
 .node-name {
-  margin-left: 8px;
   font-size: 14px;
+}
+
+.node-content {
+  margin-left: 24px;
+  padding-left: 12px;
+  border-left: 2px solid rgba(212, 165, 116, 0.2);
 }
 
 .structure-progress {
   width: 300px;
-  padding: 15px;
-  border: 1px solid #ebeef5;
-  border-radius: 4px;
-  background: #fafafa;
+  padding: 20px;
+  border: 1px solid rgba(139, 90, 43, 0.1);
+  border-radius: 12px;
+  background: white;
+  box-shadow: 0 2px 12px rgba(139, 90, 43, 0.05);
+}
+
+.structure-progress h3 {
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
+  color: #3D2914;
+  font-size: 16px;
+  margin: 0 0 16px 0;
 }
 
 .progress-details {
-  margin-top: 15px;
-  font-size: 12px;
-  color: #666;
+  margin-top: 16px;
+  font-size: 13px;
+  color: #8B7355;
+}
+
+.progress-details > div {
+  padding: 8px 0;
+  border-bottom: 1px solid rgba(139, 90, 43, 0.08);
+}
+
+.progress-details > div:last-child {
+  border-bottom: none;
+}
+
+/* 进度条颜色 */
+:deep(.el-progress-bar__inner) {
+  background: linear-gradient(90deg, #D4A574 0%, #C4956A 100%);
 }
 </style>

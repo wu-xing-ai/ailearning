@@ -175,31 +175,94 @@ onMounted(() => {
 
 <style scoped>
 .upload-container {
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
+  padding: 24px;
+  background: linear-gradient(180deg, #FFFEF7 0%, #FFF9E8 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(139, 90, 43, 0.08);
+  min-height: calc(100vh - 140px);
 }
 
 .header {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.header h2 {
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
+  color: #3D2914;
+  font-weight: 600;
+  margin-bottom: 8px;
 }
 
 .description {
-  color: #666;
-  margin-top: 10px;
+  color: #8B7355;
+  margin-top: 8px;
+  font-size: 14px;
 }
 
 .upload-area {
-  margin: 20px 0;
+  margin: 24px 0;
+}
+
+.upload-area :deep(.el-upload-dragger) {
+  background: #FFFEF7;
+  border: 2px dashed rgba(139, 90, 43, 0.2);
+  border-radius: 12px;
+  transition: all 0.3s ease;
+}
+
+.upload-area :deep(.el-upload-dragger:hover) {
+  border-color: #D4A574;
+  background: #FFF9E8;
+}
+
+.upload-area :deep(.el-icon--upload) {
+  color: #D4A574;
+}
+
+.upload-area :deep(.el-upload__tip) {
+  color: #8B7355;
 }
 
 .upload-history {
-  margin-top: 30px;
+  margin-top: 32px;
+}
+
+.upload-history h3 {
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
+  color: #3D2914;
+  font-size: 16px;
+  font-weight: 600;
+  margin-bottom: 16px;
 }
 
 .upload-actions {
-  margin: 20px 0;
+  margin: 24px 0;
   text-align: right;
+  display: flex;
+  gap: 12px;
+  justify-content: flex-end;
+}
+
+/* 表格样式 */
+.upload-history :deep(.el-table) {
+  background: transparent;
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.upload-history :deep(.el-table th.el-table__cell) {
+  background: linear-gradient(135deg, #FFFEF7 0%, #FFF5E6 100%);
+  color: #3D2914;
+  font-weight: 600;
+}
+
+.upload-history :deep(.el-table--enable-row-hover .el-table__body tr:hover > td.el-table__cell) {
+  background-color: rgba(212, 165, 116, 0.08);
+}
+
+/* 删除按钮保持危险色 */
+.upload-history :deep(.el-button--danger) {
+  background: #F56C6C;
+  border-color: #F56C6C;
 }
 </style>

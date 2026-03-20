@@ -1,0 +1,307 @@
+/**
+ * 全局主题样式 - 覆盖 Element Plus 默认颜色
+ * 主题色：温暖金棕色系
+ */
+
+:root {
+  /* 主题色变量 */
+  --primary-color: #D4A574;
+  --primary-color-light: #C4956A;
+  --primary-color-dark: #B4855A;
+  --primary-color-hover: #C4956A;
+  --primary-color-active: #B4855A;
+
+  /* 背景色 */
+  --bg-cream: #FFFEF7;
+  --bg-warm: #FFF9E8;
+  --bg-main: #F8F6F1;
+
+  /* 文字颜色 */
+  --text-primary: #3D2914;
+  --text-secondary: #5D4E37;
+  --text-muted: #8B7355;
+  --text-hint: #A89880;
+
+  /* 边框颜色 */
+  --border-color: rgba(139, 90, 43, 0.15);
+  --border-color-light: rgba(139, 90, 43, 0.1);
+}
+
+/* ========== Element Plus 按钮主题覆盖 ========== */
+
+/* Primary 按钮 */
+.el-button--primary {
+  --el-button-bg-color: #D4A574;
+  --el-button-border-color: #D4A574;
+  --el-button-text-color: #ffffff;
+  --el-button-hover-bg-color: #C4956A;
+  --el-button-hover-border-color: #C4956A;
+  --el-button-active-bg-color: #B4855A;
+  --el-button-active-border-color: #B4855A;
+  background: linear-gradient(135deg, #D4A574 0%, #C4956A 100%);
+  border: none;
+  box-shadow: 0 2px 8px rgba(212, 165, 116, 0.25);
+  transition: all 0.25s ease;
+}
+
+.el-button--primary:hover {
+  background: linear-gradient(135deg, #C4956A 0%, #B4855A 100%);
+  box-shadow: 0 4px 12px rgba(212, 165, 116, 0.35);
+  transform: translateY(-1px);
+}
+
+.el-button--primary:active {
+  background: linear-gradient(135deg, #B4855A 0%, #A4754A 100%);
+  transform: translateY(0);
+}
+
+.el-button--primary.is-disabled,
+.el-button--primary.is-disabled:hover {
+  background: linear-gradient(135deg, rgba(212, 165, 116, 0.5) 0%, rgba(196, 149, 106, 0.5) 100%);
+  box-shadow: none;
+}
+
+/* Primary 按钮 - 文字按钮 */
+.el-button--primary.is-text {
+  --el-button-text-color: #D4A574;
+  --el-button-hover-text-color: #C4956A;
+  background: transparent;
+  box-shadow: none;
+}
+
+.el-button--primary.is-text:hover {
+  background: rgba(212, 165, 116, 0.1);
+}
+
+/* Primary 按钮 - 链接按钮 */
+.el-button--primary.is-link {
+  --el-button-text-color: #D4A574;
+  --el-button-hover-text-color: #C4956A;
+}
+
+/* Default 按钮 - 也稍微调整一下风格 */
+.el-button--default {
+  background: #FFFEF7;
+  border-color: rgba(139, 90, 43, 0.2);
+  color: #5D4E37;
+  transition: all 0.25s ease;
+}
+
+.el-button--default:hover {
+  background: #FFF5E6;
+  border-color: #D4A574;
+  color: #D4A574;
+}
+
+/* Danger 按钮保持红色，但调整风格 */
+.el-button--danger {
+  box-shadow: 0 2px 8px rgba(220, 76, 100, 0.2);
+}
+
+.el-button--danger:hover {
+  box-shadow: 0 4px 12px rgba(220, 76, 100, 0.3);
+}
+
+/* ========== Element Plus Select 主题覆盖 ========== */
+.el-select {
+  --el-select-input-focus-border-color: #D4A574;
+}
+
+.el-select .el-input.is-focus .el-input__wrapper {
+  box-shadow: 0 0 0 1px #D4A574 inset !important;
+}
+
+.el-select-dropdown__item.is-selected {
+  color: #D4A574;
+}
+
+.el-select-dropdown__item:hover {
+  background-color: rgba(212, 165, 116, 0.1);
+}
+
+/* ========== Element Plus Input 主题覆盖 ========== */
+.el-input__wrapper {
+  transition: all 0.25s ease;
+}
+
+.el-input__wrapper:hover {
+  box-shadow: 0 0 0 1px rgba(212, 165, 116, 0.3) inset;
+}
+
+.el-input__wrapper.is-focus {
+  box-shadow: 0 0 0 1px #D4A574 inset !important;
+}
+
+/* ========== Element Plus Radio 主题覆盖 ========== */
+.el-radio__input.is-checked .el-radio__inner {
+  background-color: #D4A574;
+  border-color: #D4A574;
+}
+
+.el-radio__input.is-checked + .el-radio__label {
+  color: #D4A574;
+}
+
+.el-radio-button__original-radio:checked + .el-radio-button__inner {
+  background-color: #D4A574;
+  border-color: #D4A574;
+  box-shadow: -1px 0 0 0 #D4A574;
+}
+
+/* ========== Element Plus Checkbox 主题覆盖 ========== */
+.el-checkbox__input.is-checked .el-checkbox__inner {
+  background-color: #D4A574;
+  border-color: #D4A574;
+}
+
+.el-checkbox__input.is-checked + .el-checkbox__label {
+  color: #D4A574;
+}
+
+/* ========== Element Plus Switch 主题覆盖 ========== */
+.el-switch.is-checked .el-switch__core {
+  background-color: #D4A574;
+  border-color: #D4A574;
+}
+
+/* ========== Element Plus Tabs 主题覆盖 ========== */
+.el-tabs__item.is-active {
+  color: #D4A574;
+}
+
+.el-tabs__active-bar {
+  background-color: #D4A574;
+}
+
+.el-tabs__item:hover {
+  color: #C4956A;
+}
+
+/* ========== Element Plus Tag 主题覆盖 ========== */
+.el-tag--primary {
+  --el-tag-bg-color: rgba(212, 165, 116, 0.15);
+  --el-tag-border-color: rgba(212, 165, 116, 0.3);
+  --el-tag-text-color: #8B5A2B;
+}
+
+/* ========== Element Plus Progress 主题覆盖 ========== */
+.el-progress-bar__inner {
+  background: linear-gradient(90deg, #D4A574 0%, #C4956A 100%);
+}
+
+/* ========== Element Plus Dialog 主题覆盖 ========== */
+.el-dialog {
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.el-dialog__header {
+  background: linear-gradient(135deg, #FFFEF7 0%, #FFF9E8 100%);
+  border-bottom: 1px solid rgba(139, 90, 43, 0.1);
+}
+
+.el-dialog__title {
+  color: #3D2914;
+  font-weight: 600;
+}
+
+/* ========== Element Plus Table 主题覆盖 ========== */
+.el-table th.el-table__cell {
+  background-color: #FFFEF7;
+  color: #3D2914;
+}
+
+.el-table--striped .el-table__body tr.el-table__row--striped td.el-table__cell {
+  background-color: #FFFEF7;
+}
+
+.el-table__body tr:hover > td.el-table__cell {
+  background-color: rgba(212, 165, 116, 0.08) !important;
+}
+
+/* ========== Element Plus Message Box 主题覆盖 ========== */
+.el-message-box__btns .el-button--primary {
+  background: linear-gradient(135deg, #D4A574 0%, #C4956A 100%);
+  border: none;
+}
+
+/* ========== Element Plus Loading 主题覆盖 ========== */
+.el-loading-spinner .circular {
+  stroke: #D4A574;
+}
+
+.el-loading-spinner .el-loading-text {
+  color: #D4A574;
+}
+
+/* ========== Element Plus Upload 主题覆盖 ========== */
+.el-upload-dragger:hover {
+  border-color: #D4A574;
+}
+
+.el-upload-list__item-name:hover {
+  color: #D4A574;
+}
+
+/* ========== Element Plus Tree 主题覆盖 ========== */
+.el-tree-node.is-current > .el-tree-node__content {
+  background-color: rgba(212, 165, 116, 0.15);
+}
+
+.el-tree-node__content:hover {
+  background-color: rgba(212, 165, 116, 0.1);
+}
+
+/* ========== Element Plus Card 主题覆盖 ========== */
+.el-card {
+  border-radius: 12px;
+  border-color: rgba(139, 90, 43, 0.1);
+}
+
+.el-card__header {
+  border-bottom-color: rgba(139, 90, 43, 0.1);
+}
+
+/* ========== Element Plus Empty 主题覆盖 ========== */
+.el-empty__description {
+  color: #8B7355;
+}
+
+/* ========== Element Plus Message 主题覆盖 ========== */
+.el-message--success {
+  --el-message-bg-color: #F0F9EB;
+  --el-message-border-color: #E1F3D8;
+}
+
+/* ========== 滚动条美化 ========== */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 90, 43, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 90, 43, 0.35);
+}
+
+/* ========== 全局字体设置 ========== */
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Hiragino Sans GB', 'Microsoft YaHei', sans-serif;
+  color: #3D2914;
+  background: #F8F6F1;
+}
+
+/* 标题使用衬线字体 */
+h1, h2, h3, h4, h5, h6 {
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
+  color: #3D2914;
+}

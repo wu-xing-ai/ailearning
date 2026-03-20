@@ -143,26 +143,49 @@ const sortResults = () => {
 
 <style scoped>
 .search-container {
-  padding: 20px;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0,0,0,0.1);
-  min-height: calc(100vh - 120px);
+  padding: 24px;
+  background: linear-gradient(180deg, #FFFEF7 0%, #FFF9E8 100%);
+  border-radius: 16px;
+  box-shadow: 0 4px 24px rgba(139, 90, 43, 0.08);
+  min-height: calc(100vh - 140px);
 }
 
 .search-header {
-  margin-bottom: 20px;
+  margin-bottom: 24px;
+}
+
+.search-header h2 {
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
+  color: #3D2914;
+  font-weight: 600;
+  margin-bottom: 16px;
 }
 
 .search-box {
   display: flex;
-  gap: 10px;
+  gap: 12px;
   max-width: 600px;
-  margin-top: 15px;
+}
+
+.search-box :deep(.el-input__wrapper) {
+  background: white;
+  border: 1px solid rgba(139, 90, 43, 0.15);
+  border-radius: 10px;
+  box-shadow: none;
+  transition: all 0.25s ease;
+}
+
+.search-box :deep(.el-input__wrapper:hover) {
+  border-color: #D4A574;
+}
+
+.search-box :deep(.el-input__wrapper.is-focus) {
+  border-color: #D4A574;
+  box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.15);
 }
 
 .search-results {
-  margin-top: 20px;
+  margin-top: 24px;
 }
 
 .results-header {
@@ -170,8 +193,10 @@ const sortResults = () => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 20px;
-  padding-bottom: 15px;
-  border-bottom: 1px solid #eee;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(139, 90, 43, 0.1);
+  color: #8B7355;
+  font-size: 14px;
 }
 
 .results-content {
@@ -181,41 +206,45 @@ const sortResults = () => {
 .result-list {
   display: flex;
   flex-direction: column;
-  gap: 15px;
+  gap: 16px;
 }
 
 .result-item {
   padding: 20px;
-  border: 1px solid #e8e8e8;
-  border-radius: 8px;
-  transition: all 0.3s;
+  background: white;
+  border: 1px solid rgba(139, 90, 43, 0.1);
+  border-radius: 12px;
+  transition: all 0.3s ease;
   cursor: pointer;
+  box-shadow: 0 2px 8px rgba(139, 90, 43, 0.04);
 }
 
 .result-item:hover {
-  border-color: #1890ff;
-  box-shadow: 0 2px 8px rgba(24, 144, 255, 0.15);
+  border-color: #D4A574;
+  box-shadow: 0 4px 16px rgba(212, 165, 116, 0.15);
+  transform: translateY(-2px);
 }
 
 .result-header {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  gap: 12px;
+  margin-bottom: 12px;
 }
 
 .result-title {
   margin: 0;
   font-size: 16px;
   font-weight: 600;
-  color: #333;
+  color: #3D2914;
+  font-family: 'Noto Serif SC', 'Source Han Serif CN', Georgia, serif;
 }
 
 .result-snippet {
-  color: #666;
+  color: #5D4E37;
   font-size: 14px;
-  line-height: 1.6;
-  margin: 0 0 10px 0;
+  line-height: 1.7;
+  margin: 0 0 12px 0;
 }
 
 .result-footer {
@@ -223,13 +252,33 @@ const sortResults = () => {
   justify-content: space-between;
   align-items: center;
   font-size: 12px;
-  color: #999;
+  color: #8B7355;
 }
 
+/* 高亮关键词 */
 :deep(.highlight) {
-  background-color: #fff3cd;
-  color: #856404;
-  padding: 0 2px;
-  border-radius: 2px;
+  background-color: rgba(212, 165, 116, 0.3);
+  color: #8B5A2B;
+  padding: 1px 4px;
+  border-radius: 3px;
+}
+
+/* Radio 按钮组样式 */
+:deep(.el-radio-button__inner) {
+  border-color: rgba(139, 90, 43, 0.2);
+  color: #5D4E37;
+}
+
+:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
+  background: linear-gradient(135deg, #D4A574 0%, #C4956A 100%);
+  border-color: #D4A574;
+  box-shadow: -1px 0 0 0 #D4A574;
+}
+
+/* Tag 标签样式 */
+:deep(.el-tag--info) {
+  background-color: rgba(139, 90, 43, 0.08);
+  border-color: rgba(139, 90, 43, 0.15);
+  color: #8B7355;
 }
 </style>

@@ -33,12 +33,13 @@
           <div
             v-for="(message, index) in messages"
             :key="message.id || index"
+            v-show="message.type !== 'assistant' || message.content || !isWaitingForResponse"
             class="message"
             :class="message.type"
           >
             <!-- AI 消息 -->
             <template v-if="message.type === 'assistant'">
-              <div class="avatar ai-avatar">
+              <div class="avatar ai-avatar" :class="{ 'thinking-avatar': message.isStreaming && !message.content }">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
                   <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/>
                 </svg>
@@ -55,8 +56,8 @@
                     class="markdown-content"
                     v-html="renderMarkdown(message.content)"
                   ></div>
-                  <!-- 打字机光标 - 流式传输中且没有内容时只显示光标 -->
-                  <span v-if="message.isStreaming" class="typing-cursor"></span>
+                  <!-- 打字机光标 - 流式传输中有内容时显示 -->
+                  <span v-if="message.isStreaming && message.content" class="typing-cursor"></span>
                 </div>
                 <!-- 错误重试按钮 -->
                 <button v-if="message.isError" @click="retryMessage(index)" class="retry-btn">
@@ -97,18 +98,23 @@
           </div>
         </TransitionGroup>
 
-        <!-- AI 思考中骨架屏 - 只在等待响应且AI消息还未创建时显示 -->
-        <div v-if="isLoading && (messages.length === 0 || messages[messages.length - 1].type !== 'assistant')" class="message assistant thinking">
-          <div class="avatar ai-avatar">
+        <!-- AI 思考中动画 -->
+        <div v-if="isLoading && isWaitingForResponse" class="message assistant thinking">
+          <div class="avatar ai-avatar thinking-avatar">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09z"/>
+              <path d="M9.813 15.904L9 18.75l-.813-2.846a4.5 4.5 0 00-3.09-3.09L2.25 12l2.846-.813a4.5 4.5 0 003.09-3.09L9 5.25l.813 2.846a4.5 4.5 0 003.09 3.09L15.75 12l-2.846.813a4.5 4.5 0 00-3.09 3.09zM18.259 8.715L18 9.75l-.259-1.035a3.375 3.375 0 00-2.455-2.456L14.25 6l1.036-.259a3.375 3.375 0 002.455-2.456L18 2.25l.259 1.035a3.375 3.375 0 002.456 2.456L21.75 6l-1.035.259a3.375 3.375 0 00-2.456 2.456z"/>
             </svg>
           </div>
           <div class="message-body">
-            <div class="skeleton-bubble">
-              <div class="skeleton-line" style="width: 60%"></div>
-              <div class="skeleton-line" style="width: 85%"></div>
-              <div class="skeleton-line" style="width: 45%"></div>
+            <div class="thinking-indicator">
+              <div class="thinking-header">
+                <span class="thinking-label">AI 正在思考</span>
+              </div>
+              <div class="thinking-dots">
+                <span class="dot"></span>
+                <span class="dot"></span>
+                <span class="dot"></span>
+              </div>
             </div>
           </div>
         </div>
@@ -264,6 +270,7 @@ marked.setOptions({
 const messages = ref([])
 const inputMessage = ref('')
 const isLoading = ref(false)
+const isWaitingForResponse = ref(false)
 const chatWindowRef = ref(null)
 let messageIdCounter = 0
 
@@ -469,6 +476,7 @@ const sendMessage = async () => {
   if (!inputMessage.value.trim() || isLoading.value) return
 
   isLoading.value = true
+  isWaitingForResponse.value = true
   const userText = inputMessage.value
   inputMessage.value = ''
 
@@ -538,6 +546,10 @@ const sendMessage = async () => {
           try {
             const data = JSON.parse(line.slice(6))
             if (data.content) {
+              // 收到第一个响应，关闭等待动画
+              if (isWaitingForResponse.value) {
+                isWaitingForResponse.value = false
+              }
               fullResponse += data.content
               // 直接更新数组中的对象
               messages.value[aiMsgIndex].content = fullResponse
@@ -555,12 +567,14 @@ const sendMessage = async () => {
 
     // 完成流式响应
     messages.value[aiMsgIndex].isStreaming = false
+    isWaitingForResponse.value = false
 
     if (!fullResponse) {
       messages.value[aiMsgIndex].content = '[无响应内容]'
     }
 
   } catch (error) {
+    isWaitingForResponse.value = false
     messages.value[aiMsgIndex].isStreaming = false
     messages.value[aiMsgIndex].isError = true
     messages.value[aiMsgIndex].content = `连接失败: ${error.message}`
@@ -568,6 +582,7 @@ const sendMessage = async () => {
     ElMessage.error('发送失败: ' + error.message)
   } finally {
     isLoading.value = false
+    isWaitingForResponse.value = false
   }
 }
 
@@ -1157,32 +1172,91 @@ if (typeof window !== 'undefined') {
   border-color: #DC4C64;
 }
 
-/* ========== 骨架屏 ========== */
-.skeleton-bubble {
+/* ========== 思考中动画 ========== */
+.thinking-indicator {
   background: white;
   border: 1px solid rgba(139, 90, 43, 0.1);
   border-radius: 18px;
   border-top-left-radius: 4px;
-  padding: 16px 20px;
+  padding: 16px 24px;
   box-shadow: 0 2px 12px rgba(139, 90, 43, 0.06);
+  display: flex;
+  align-items: center;
+  gap: 16px;
 }
 
-.skeleton-line {
-  height: 14px;
-  background: linear-gradient(90deg, #F5F0E6 25%, #EDE5D8 50%, #F5F0E6 75%);
-  background-size: 200% 100%;
-  border-radius: 4px;
-  margin-bottom: 10px;
-  animation: skeletonShimmer 1.5s ease-in-out infinite;
+.thinking-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
 }
 
-.skeleton-line:last-child {
-  margin-bottom: 0;
+.thinking-label {
+  font-size: 14px;
+  font-weight: 500;
+  color: #8B7355;
+  animation: thinkingPulse 2s ease-in-out infinite;
 }
 
-@keyframes skeletonShimmer {
-  0% { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
+.thinking-dots {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.thinking-dots .dot {
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(135deg, #D4A574 0%, #C4956A 100%);
+  border-radius: 50%;
+  animation: dotBounce 1.4s ease-in-out infinite;
+}
+
+.thinking-dots .dot:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.thinking-dots .dot:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.thinking-dots .dot:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.thinking-avatar {
+  animation: avatarPulse 2s ease-in-out infinite;
+}
+
+@keyframes dotBounce {
+  0%, 80%, 100% {
+    transform: translateY(0);
+    opacity: 0.4;
+  }
+  40% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
+}
+
+@keyframes thinkingPulse {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+@keyframes avatarPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 2px 8px rgba(212, 165, 116, 0.3);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 4px 16px rgba(212, 165, 116, 0.4);
+  }
 }
 
 /* ========== 输入区域 ========== */
