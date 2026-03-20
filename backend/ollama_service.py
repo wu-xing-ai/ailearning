@@ -61,7 +61,7 @@ class OllamaService(BASE_CLASS):
         Returns:
             包含响应内容的字典
         """
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=60.0) as client:
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=60.0, trust_env=False) as client:
             try:
                 response = await client.post(
                     "/api/chat",
@@ -96,7 +96,7 @@ class OllamaService(BASE_CLASS):
         Yields:
             每次生成的文本片段
         """
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=60.0) as client:
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=60.0, trust_env=False) as client:
             try:
                 async with client.stream(
                     "POST",
@@ -143,7 +143,7 @@ class OllamaService(BASE_CLASS):
 
     async def get_available_models(self) -> List[str]:
         """获取可用的模型列表"""
-        async with httpx.AsyncClient(base_url=self.base_url, timeout=10.0) as client:
+        async with httpx.AsyncClient(base_url=self.base_url, timeout=10.0, trust_env=False) as client:
             try:
                 response = await client.get("/api/tags")
                 response.raise_for_status()
