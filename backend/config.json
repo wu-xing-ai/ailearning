@@ -15,7 +15,7 @@
       "name": "Qwen/Qwen2.5-7B-Instruct",
       "provider": "siliconflow",
       "api_url": "https://api.siliconflow.cn/v1",
-      "api_key": "sk-ebfrhznkzfmpprbyzhhnusvhxnfcqvhgiobjwrdspdpdzpze"
+      "api_key": ""
     }
   ]
 }

@@ -14,6 +14,7 @@ class Document(Base):
     filename = Column(String(255), nullable=False)
     file_type = Column(String(20), nullable=False)
     content = Column(Text, nullable=True)
+    file_path = Column(String(500), nullable=True)  # 原始文件存储路径
     processed = Column(Boolean, default=False)
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
@@ -25,6 +26,7 @@ class Document(Base):
             "filename": self.filename,
             "file_type": self.file_type,
             "content": self.content,
+            "file_path": self.file_path,
             "processed": self.processed,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None

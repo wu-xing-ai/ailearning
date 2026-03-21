@@ -7,6 +7,8 @@ import json
 from datetime import datetime
 import os
 import sys
+import shutil
+from urllib.parse import unquote
 
 # 添加当前目录到路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -91,8 +93,19 @@ async def upload_document(file: UploadFile = File(...)):
     """上传文档到知识库"""
     from sqlalchemy.orm import Session
 
+    # 处理文件名编码（支持中文文件名）
+    filename = file.filename
+    try:
+        # 尝试修复可能的编码问题
+        if isinstance(filename, bytes):
+            filename = filename.decode('utf-8')
+        # 处理 URL 编码的文件名
+        filename = unquote(filename)
+    except:
+        pass
+
     # 1. 验证文件类型
-    file_type = DocumentProcessor.get_file_type(file.filename)
+    file_type = DocumentProcessor.get_file_type(filename)
     if file_type == 'unknown':
         raise HTTPException(status_code=400, detail="不支持的文件格式，仅支持 PDF、DOCX、TXT、XLSX、MD")
 
@@ -102,20 +115,32 @@ async def upload_document(file: UploadFile = File(...)):
     # 3. 提取文本内容
     try:
         text_content, file_type_name = DocumentProcessor.extract_content(
-            content_bytes, file_type, file.filename
+            content_bytes, file_type, filename
         )
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"文件处理失败: {str(e)}")
 
-    # 4. 保存到数据库
+    # 4. 生成文档ID
+    doc_id = str(uuid.uuid4())
+
+    # 5. 保存原始文件到 knowledge_base 目录
+    knowledge_base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge_base")
+    doc_dir = os.path.join(knowledge_base_dir, doc_id)
+    os.makedirs(doc_dir, exist_ok=True)
+
+    file_path = os.path.join(doc_dir, filename)
+    with open(file_path, "wb") as f:
+        f.write(content_bytes)
+
+    # 6. 保存到数据库
     db = next(get_db())
     try:
-        doc_id = str(uuid.uuid4())
         document = DocumentModel(
             id=doc_id,
-            filename=file.filename,
+            filename=filename,
             file_type=file_type_name,
             content=text_content,
+            file_path=file_path,
             processed=False
         )
         db.add(document)
@@ -126,8 +151,9 @@ async def upload_document(file: UploadFile = File(...)):
     return {
         "id": doc_id,
         "status": "uploaded",
-        "filename": file.filename,
-        "file_type": file_type_name
+        "filename": filename,
+        "file_type": file_type_name,
+        "file_path": file_path
     }
 
 @app.get("/api/documents")
@@ -200,6 +226,13 @@ async def delete_document(doc_id: str):
         document = db.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+
+        # 删除原始文件目录
+        knowledge_base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge_base")
+        doc_dir = os.path.join(knowledge_base_dir, doc_id)
+        if os.path.exists(doc_dir):
+            shutil.rmtree(doc_dir)
+
         db.delete(document)
         db.commit()
         return {"status": "deleted", "id": doc_id}

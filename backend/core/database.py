@@ -9,7 +9,7 @@ from sqlalchemy.orm import sessionmaker
 # 数据库连接配置
 DATABASE_URL = os.getenv(
     "DATABASE_URL",
-    "mysql+pymysql://root:wjx1314520@localhost:3306/ailearning"
+    "mysql+pymysql://root:wjx1314520@localhost:3306/ailearning?charset=utf8mb4"
 )
 
 # 创建数据库引擎

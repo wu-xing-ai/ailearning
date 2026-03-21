@@ -12,6 +12,9 @@
       "Bash(python main.py)",
       "mcp__chrome-devtools__upload_file",
       "mcp__chrome-devtools__wait_for"
+    ],
+    "additionalDirectories": [
+      "e:\\study\\ailearning\\backend"
     ]
   }
 }
