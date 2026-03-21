@@ -63,6 +63,24 @@ chat_sessions = {}
 # API密钥存储
 api_keys_storage = {}
 
+# 自定义模型存储文件路径
+CUSTOM_MODELS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)), "custom_models.json")
+
+def load_custom_models():
+    """加载自定义模型配置"""
+    if os.path.exists(CUSTOM_MODELS_FILE):
+        try:
+            with open(CUSTOM_MODELS_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except:
+            return []
+    return []
+
+def save_custom_models(models):
+    """保存自定义模型配置"""
+    with open(CUSTOM_MODELS_FILE, "w", encoding="utf-8") as f:
+        json.dump(models, f, ensure_ascii=False, indent=2)
+
 # 启动时初始化数据库
 @app.on_event("startup")
 async def startup_event():
@@ -320,8 +338,14 @@ async def chat_with_ai(request: dict):
             )
 
         if stream:
-            # 流式响应 - 需要await来获取async generator
-            generator = await service.chat_completion(prompt, stream=True)
+            # 流式响应 - await获取async generator
+            result = service.chat_completion(prompt, stream=True)
+            # 如果是coroutine，需要await
+            import inspect
+            if inspect.iscoroutine(result):
+                generator = await result
+            else:
+                generator = result
             return StreamHandler.create_stream(generator)
         else:
             # 非流式响应
@@ -531,6 +555,64 @@ async def get_supported_providers():
         "providers": providers,
         "info": {k: v for k, v in provider_info.items() if k in providers}
     }
+
+
+# ==================== 自定义模型管理端点 ====================
+
+@app.get("/api/ai/custom-models")
+async def get_custom_models():
+    """获取所有自定义模型"""
+    models = load_custom_models()
+    return {"models": models}
+
+
+@app.post("/api/ai/custom-models")
+async def add_custom_model(request: dict):
+    """添加自定义模型"""
+    name = request.get("name")
+    api_url = request.get("apiUrl")
+    api_key = request.get("apiKey", "")
+
+    if not name or not api_url:
+        raise HTTPException(status_code=400, detail="模型名称和API地址不能为空")
+
+    models = load_custom_models()
+
+    # 检查是否已存在
+    for m in models:
+        if m["name"] == name:
+            # 更新现有模型
+            m["api_url"] = api_url
+            m["api_key"] = api_key
+            save_custom_models(models)
+            return {"status": "updated", "model": m}
+
+    # 添加新模型
+    new_model = {
+        "name": name,
+        "api_url": api_url,
+        "api_key": api_key,
+        "created_at": datetime.now().isoformat()
+    }
+    models.append(new_model)
+    save_custom_models(models)
+
+    return {"status": "created", "model": new_model}
+
+
+@app.delete("/api/ai/custom-models/{model_name}")
+async def delete_custom_model(model_name: str):
+    """删除自定义模型"""
+    models = load_custom_models()
+    original_count = len(models)
+
+    models = [m for m in models if m["name"] != model_name]
+
+    if len(models) == original_count:
+        raise HTTPException(status_code=404, detail="模型不存在")
+
+    save_custom_models(models)
+    return {"status": "deleted", "model_name": model_name}
 
 @app.post("/api/knowledge/process")
 async def process_knowledge(doc_id: str = Query(..., description="文档ID")):

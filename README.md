@@ -63,7 +63,8 @@ ailearning/
 │   │   ├── anthropic_service.py
 │   │   ├── zhipu_service.py
 │   │   ├── qwen_service.py
-│   │   └── siliconflow_service.py
+│   │   ├── siliconflow_service.py
+│   │   └── custom_service.py   # 自定义API服务
 │   │
 │   └── knowledge_base/         # 原始文件存储目录
 │       └── {doc_id}/           # 按文档ID分目录
@@ -148,6 +149,18 @@ npm run dev
 | SiliconFlow | 是              | 多种开源模型        |
 | 自定义      | 是              | 兼容OpenAI格式的API |
 
+---
+
+## 📖 后端接口文档
+
+详细的API接口文档请查看 **[inter.md](inter.md)**
+
+## ⚙️ 配置文件
+
+API密钥等配置存储在 **[backend/config.json](backend/config.json)**
+
+> ⚠️ 请勿将包含真实API密钥的 config.json 提交到版本控制系统
+
 ## 开发进度
 
 ### 已完成
@@ -160,6 +173,8 @@ npm run dev
 - [X] 知识库管理界面
 - [X] 文档上传功能
 - [X] 原始文件存储
+- [X] 自定义API模型接入
+- [X] API错误处理优化
 
 ### 计划中
 

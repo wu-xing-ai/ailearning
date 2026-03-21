@@ -74,8 +74,15 @@ class CustomService(BaseAIService):
         """生成完整响应"""
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:
-                # 假设使用OpenAI兼容的端点
-                endpoint = f"{self.api_url}/chat/completions"
+                # 构建API端点 - 支持多种URL格式
+                base_url = self.api_url.rstrip('/')
+                # 如果URL已经包含完整路径，直接使用；否则添加/v1/chat/completions
+                if base_url.endswith('/chat/completions'):
+                    endpoint = base_url
+                elif '/v1' in base_url:
+                    endpoint = f"{base_url}/chat/completions"
+                else:
+                    endpoint = f"{base_url}/v1/chat/completions"
 
                 response = await client.post(
                     endpoint,
@@ -86,7 +93,17 @@ class CustomService(BaseAIService):
                 data = response.json()
 
                 # 尝试解析响应（兼容OpenAI格式）
-                content = data["choices"][0]["message"]["content"]
+                if "choices" not in data or not data["choices"]:
+                    return {"error": f"API返回格式异常: {data}"}
+
+                choice = data["choices"][0]
+                if "message" not in choice:
+                    return {"error": f"API返回格式异常(无message): {data}"}
+
+                content = choice["message"].get("content", "")
+
+                if not content:
+                    return {"error": f"API返回空内容: {data}"}
 
                 # 保存到上下文
                 self.add_to_context("user", messages[-1]["content"])
@@ -115,7 +132,14 @@ class CustomService(BaseAIService):
         async with httpx.AsyncClient(timeout=60.0) as client:
             try:
                 full_content = ""
-                endpoint = f"{self.api_url}/chat/completions"
+                # 构建API端点 - 支持多种URL格式
+                base_url = self.api_url.rstrip('/')
+                if base_url.endswith('/chat/completions'):
+                    endpoint = base_url
+                elif '/v1' in base_url:
+                    endpoint = f"{base_url}/chat/completions"
+                else:
+                    endpoint = f"{base_url}/v1/chat/completions"
 
                 async with client.stream(
                     "POST",
@@ -133,11 +157,14 @@ class CustomService(BaseAIService):
                                     break
                                 try:
                                     data = json.loads(data_str)
-                                    delta = data["choices"][0].get("delta", {})
-                                    if "content" in delta:
-                                        chunk = delta["content"]
-                                        full_content += chunk
-                                        yield chunk
+                                    # 安全访问choices
+                                    choices = data.get("choices", [])
+                                    if choices and len(choices) > 0:
+                                        delta = choices[0].get("delta", {})
+                                        if "content" in delta:
+                                            chunk = delta["content"]
+                                            full_content += chunk
+                                            yield chunk
                                 except json.JSONDecodeError:
                                     continue
 

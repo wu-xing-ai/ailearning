@@ -308,6 +308,9 @@ const modelLists = ref({
   custom: []
 })
 
+// 自定义模型的配置存储 (每个模型独立的配置)
+const customModelConfigs = ref({})  // { modelName: { apiUrl, apiKey } }
+
 // 当前可用模型
 const currentModels = computed(() => {
   const provider = selectedProvider.value
@@ -425,6 +428,28 @@ const saveOllamaConfig = async () => {
   }
 }
 
+// 加载自定义模型列表
+const loadCustomModels = async () => {
+  try {
+    const response = await api.get('/api/ai/custom-models')
+    if (response.models) {
+      modelLists.value.custom = response.models.map(m => ({
+        value: m.name,
+        label: m.name
+      }))
+      // 恢复每个模型的配置
+      response.models.forEach(m => {
+        customModelConfigs.value[m.name] = {
+          apiUrl: m.api_url,
+          apiKey: m.api_key || ''
+        }
+      })
+    }
+  } catch (error) {
+    console.error('加载自定义模型失败:', error)
+  }
+}
+
 // 刷新Ollama模型列表
 const refreshOllamaModels = async () => {
   try {
@@ -444,23 +469,45 @@ const refreshOllamaModels = async () => {
 }
 
 // 添加自定义模型
-const addCustomModel = () => {
+const addCustomModel = async () => {
   if (!customModelConfig.value.name || !customModelConfig.value.apiUrl) {
     ElMessage.error('请填写模型名称和API地址')
     return
   }
 
+  const modelName = customModelConfig.value.name
+
+  // 检查是否已存在
+  if (modelLists.value.custom.some(m => m.value === modelName)) {
+    ElMessage.error('该模型名称已存在')
+    return
+  }
+
+  // 添加到模型列表
   modelLists.value.custom.push({
-    value: customModelConfig.value.name,
-    label: customModelConfig.value.name
+    value: modelName,
+    label: modelName
   })
 
-  if (customModelConfig.value.apiKey) {
-    apiKeys.value.custom = customModelConfig.value.apiKey
+  // 保存自定义模型的独立配置
+  customModelConfigs.value[modelName] = {
+    apiUrl: customModelConfig.value.apiUrl,
+    apiKey: customModelConfig.value.apiKey || ''
+  }
+
+  // 同步到后端存储
+  try {
+    await api.post('/api/ai/custom-models', {
+      name: modelName,
+      apiUrl: customModelConfig.value.apiUrl,
+      apiKey: customModelConfig.value.apiKey || ''
+    })
+  } catch (error) {
+    console.error('保存自定义模型失败:', error)
   }
 
   selectedProvider.value = 'custom'
-  selectedModel.value = customModelConfig.value.name
+  selectedModel.value = modelName
 
   ElMessage.success('自定义模型已添加')
   customModelConfig.value = { name: '', apiUrl: '', apiKey: '' }
@@ -491,15 +538,24 @@ const sendMessage = async () => {
   scrollToBottom()
 
   // 构造请求
+  let requestConfig = {
+    type: selectedProvider.value,
+    name: selectedModel.value,
+    apiKey: apiKeys.value[selectedProvider.value] || '',
+    apiUrl: undefined
+  }
+
+  // 如果是自定义模型，使用该模型的独立配置
+  if (selectedProvider.value === 'custom' && customModelConfigs.value[selectedModel.value]) {
+    const customConfig = customModelConfigs.value[selectedModel.value]
+    requestConfig.apiKey = customConfig.apiKey || ''
+    requestConfig.apiUrl = customConfig.apiUrl
+  }
+
   const requestData = {
     prompt: userText,
     stream: true,
-    modelConfig: {
-      type: selectedProvider.value,
-      name: selectedModel.value,
-      apiKey: apiKeys.value[selectedProvider.value],
-      apiUrl: selectedProvider.value === 'custom' ? customModelConfig.value.apiUrl : undefined
-    }
+    modelConfig: requestConfig
   }
 
   // 创建AI消息索引
@@ -644,6 +700,9 @@ const formatDate = (date) => {
 onMounted(async () => {
   // 加载Ollama模型
   await refreshOllamaModels()
+
+  // 加载自定义模型
+  await loadCustomModels()
 
   // 加载其他厂商默认模型
   modelLists.value.openai = [

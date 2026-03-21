@@ -14,7 +14,8 @@
       "mcp__chrome-devtools__wait_for"
     ],
     "additionalDirectories": [
-      "e:\\study\\ailearning\\backend"
+      "e:\\study\\ailearning\\backend",
+      "C:\\Users\\xin\\.cache\\chrome-devtools-mcp\\chrome-profile"
     ]
   }
 }
