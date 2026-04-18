@@ -21,10 +21,11 @@
           </template>
         </el-table-column>
         <el-table-column prop="created_at" label="上传时间" width="180"></el-table-column>
-        <el-table-column label="操作" width="150">
+        <el-table-column label="操作" width="220">
           <template #default="{ row }">
-            <el-button size="small" @click="processDocument(row.id)">处理</el-button>
-            <el-button size="small" type="danger" @click="confirmDelete(row.id)">删除</el-button>
+            <el-button size="small" :loading="processingDocId === row.id" @click="processDocument(row.id)">处理</el-button>
+            <el-button size="small" :disabled="!row.processed" @click="viewStructure(row.id)">查看结构</el-button>
+            <el-button size="small" type="danger" :loading="deletingDocId === row.id" @click="confirmDelete(row.id)">删除</el-button>
           </template>
         </el-table-column>
       </el-table>
@@ -67,15 +68,19 @@
 
 <script setup>
 import { ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { UploadFilled } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 
+const router = useRouter()
 const documents = ref([])
 const showUploadDialog = ref(false)
 const fileList = ref([])
 const loading = ref(false)
 const uploading = ref(false)
+const processingDocId = ref('')
+const deletingDocId = ref('')
 
 // 格式化日期时间
 const formatDateTime = (dateStr) => {
@@ -114,13 +119,21 @@ const refreshLibrary = async () => {
 
 // 处理文档
 const processDocument = async (docId) => {
+  processingDocId.value = docId
   try {
     await api.post(`/api/knowledge/process?doc_id=${docId}`)
-    ElMessage.success('文档处理完成')
+    ElMessage.success('文档处理完成，正在跳转结构化页面')
     await loadDocuments()
+    await router.push({ path: '/smart-structure', query: { doc_id: docId } })
   } catch (error) {
     ElMessage.error('处理失败: ' + error.message)
+  } finally {
+    processingDocId.value = ''
   }
+}
+
+const viewStructure = async (docId) => {
+  await router.push({ path: '/smart-structure', query: { doc_id: docId } })
 }
 
 // 确认删除
@@ -139,12 +152,15 @@ const confirmDelete = async (docId) => {
 
 // 删除文档
 const deleteDocument = async (docId) => {
+  deletingDocId.value = docId
   try {
     await api.deleteDocument(docId)
-    ElMessage.success('删除成功')
-    await loadDocuments()
+    documents.value = documents.value.filter(doc => doc.id !== docId)
+    ElMessage.success('删除成功，列表已更新')
   } catch (error) {
     ElMessage.error('删除失败: ' + error.message)
+  } finally {
+    deletingDocId.value = ''
   }
 }
 

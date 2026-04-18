@@ -12,33 +12,41 @@
         />
         <el-button type="primary" @click="performSearch" :loading="searching">搜索</el-button>
       </div>
+      <div class="search-mode">
+        <el-segmented v-model="searchMode" :options="searchModeOptions" size="default" />
+      </div>
     </div>
 
     <div class="search-results">
       <div class="results-header">
-        <span v-if="hasSearched">找到 {{ searchResults.length }} 个结果</span>
+        <span v-if="hasSearched">找到 {{ searchResults.length }} 个结果 ({{ searchModeLabel }})</span>
         <span v-else>输入关键词搜索知识库中的文档</span>
-        <el-radio-group v-model="sortBy" size="small" @change="sortResults">
-          <el-radio-button label="relevance">相关性</el-radio-button>
-          <el-radio-button label="time">时间</el-radio-button>
-          <el-radio-button label="type">类型</el-radio-button>
-        </el-radio-group>
       </div>
 
       <div class="results-content" v-loading="searching">
         <el-empty v-if="hasSearched && searchResults.length === 0" description="未找到相关结果" />
 
         <div class="result-list">
-          <div class="result-item" v-for="result in searchResults" :key="result.id">
+          <div class="result-item" v-for="(result, idx) in searchResults" :key="idx">
             <div class="result-main">
               <div class="result-header">
-                <h3 class="result-title">{{ result.filename }}</h3>
-                <el-tag size="small" type="info">{{ result.file_type }}</el-tag>
+                <h3 class="result-title">{{ result.filename || '文档' }}</h3>
+                <el-tag size="small" type="info">{{ result.file_type || 'txt' }}</el-tag>
+                <el-tag v-if="result.source" size="small" :type="sourceTagType(result.source)">
+                  {{ sourceLabel(result.source) }}
+                </el-tag>
               </div>
-              <p class="result-snippet" v-html="highlightKeyword(result.snippet)"></p>
+              <p class="result-snippet" v-html="highlightKeyword(result.snippet || result.text)"></p>
               <div class="result-footer">
+                <div class="result-meta">
+                  <span v-if="result.score" class="result-score">
+                    相似度: {{ (result.score * 100).toFixed(1) }}%
+                    <el-progress :percentage="Math.round(result.score * 100)" :show-text="false" :stroke-width="6" style="width: 80px; margin-left: 4px" />
+                  </span>
+                  <span v-if="result.chunk_index !== undefined" class="result-chunk">分块 #{{ result.chunk_index }}</span>
+                </div>
                 <span class="result-status">
-                  <el-tag :type="result.processed ? 'success' : 'warning'" size="small">
+                  <el-tag v-if="result.processed !== undefined" :type="result.processed ? 'success' : 'warning'" size="small">
                     {{ result.processed ? '已处理' : '待处理' }}
                   </el-tag>
                 </span>
@@ -53,46 +61,59 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 
 const searchQuery = ref('')
-const sortBy = ref('relevance')
+const searchMode = ref('hybrid')
 const searching = ref(false)
 const hasSearched = ref(false)
 const searchResults = ref([])
 
-// 格式化日期时间
+const searchModeOptions = [
+  { label: '混合搜索', value: 'hybrid' },
+  { label: '关键词', value: 'keyword' },
+  { label: '语义', value: 'semantic' },
+]
+
+const searchModeLabel = computed(() => {
+  const map = { hybrid: '混合搜索', keyword: '关键词搜索', semantic: '语义搜索' }
+  return map[searchMode.value] || searchMode.value
+})
+
+const sourceTagType = (source) => {
+  const map = { keyword: 'warning', semantic: 'success', hybrid: '' }
+  return map[source] || 'info'
+}
+
+const sourceLabel = (source) => {
+  const map = { keyword: '关键词', semantic: '语义', hybrid: '混合' }
+  return map[source] || source
+}
+
 const formatDateTime = (dateStr) => {
   if (!dateStr) return ''
   const date = new Date(dateStr)
   return date.toLocaleString('zh-CN', {
-    year: 'numeric',
-    month: '2-digit',
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit'
+    year: 'numeric', month: '2-digit', day: '2-digit',
+    hour: '2-digit', minute: '2-digit'
   })
 }
 
-// 高亮关键词
 const highlightKeyword = (text) => {
-  if (!text || !searchQuery.value) return text
+  if (!text || !searchQuery.value) return text || ''
   const keyword = searchQuery.value.trim()
   if (!keyword) return text
-
   const regex = new RegExp(`(${escapeRegExp(keyword)})`, 'gi')
   return text.replace(regex, '<mark class="highlight">$1</mark>')
 }
 
-// 转义正则特殊字符
 const escapeRegExp = (string) => {
   return string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
 }
 
-// 执行搜索
 const performSearch = async () => {
   if (!searchQuery.value.trim()) {
     ElMessage.warning('请输入搜索关键词')
@@ -103,12 +124,16 @@ const performSearch = async () => {
   hasSearched.value = true
 
   try {
-    const response = await fetch(`/api/documents/search?q=${encodeURIComponent(searchQuery.value.trim())}`)
-    const results = await response.json()
-    searchResults.value = results
+    if (searchMode.value === 'keyword') {
+      const response = await fetch(`/api/documents/search?q=${encodeURIComponent(searchQuery.value.trim())}`)
+      searchResults.value = await response.json()
+    } else {
+      const result = await api.semanticSearch(searchQuery.value.trim(), searchMode.value)
+      searchResults.value = result.results || []
+    }
 
-    if (results.length > 0) {
-      ElMessage.success(`找到 ${results.length} 个相关结果`)
+    if (searchResults.value.length > 0) {
+      ElMessage.success(`找到 ${searchResults.value.length} 个相关结果`)
     } else {
       ElMessage.info('未找到相关结果')
     }
@@ -117,27 +142,6 @@ const performSearch = async () => {
   } finally {
     searching.value = false
   }
-}
-
-// 排序结果
-const sortResults = () => {
-  if (searchResults.value.length === 0) return
-
-  const results = [...searchResults.value]
-
-  switch (sortBy.value) {
-    case 'time':
-      results.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
-      break
-    case 'type':
-      results.sort((a, b) => (a.file_type || '').localeCompare(b.file_type || ''))
-      break
-    default:
-      // 相关性 - 保持原顺序
-      break
-  }
-
-  searchResults.value = results
 }
 </script>
 
@@ -182,6 +186,19 @@ const sortResults = () => {
 .search-box :deep(.el-input__wrapper.is-focus) {
   border-color: #D4A574;
   box-shadow: 0 0 0 3px rgba(212, 165, 116, 0.15);
+}
+
+.search-mode {
+  margin-top: 12px;
+}
+
+.search-mode :deep(.el-segmented) {
+  background: rgba(139, 90, 43, 0.06);
+}
+
+.search-mode :deep(.el-segmented__item-selected) {
+  background: linear-gradient(135deg, #D4A574 0%, #C4956A 100%);
+  color: white;
 }
 
 .search-results {
@@ -255,6 +272,23 @@ const sortResults = () => {
   color: #8B7355;
 }
 
+.result-meta {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.result-score {
+  display: flex;
+  align-items: center;
+  color: #D4A574;
+  font-weight: 500;
+}
+
+.result-chunk {
+  color: #8B7355;
+}
+
 /* 高亮关键词 */
 :deep(.highlight) {
   background-color: rgba(212, 165, 116, 0.3);
@@ -263,22 +297,14 @@ const sortResults = () => {
   border-radius: 3px;
 }
 
-/* Radio 按钮组样式 */
-:deep(.el-radio-button__inner) {
-  border-color: rgba(139, 90, 43, 0.2);
-  color: #5D4E37;
-}
-
-:deep(.el-radio-button__original-radio:checked + .el-radio-button__inner) {
-  background: linear-gradient(135deg, #D4A574 0%, #C4956A 100%);
-  border-color: #D4A574;
-  box-shadow: -1px 0 0 0 #D4A574;
-}
-
 /* Tag 标签样式 */
 :deep(.el-tag--info) {
   background-color: rgba(139, 90, 43, 0.08);
   border-color: rgba(139, 90, 43, 0.15);
   color: #8B7355;
+}
+
+:deep(.el-progress-bar__inner) {
+  background: linear-gradient(90deg, #D4A574 0%, #C4956A 100%);
 }
 </style>

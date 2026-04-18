@@ -1,9 +1,14 @@
 [
-  
   {
     "name": "glm-5",
     "api_url": "https://mydamoxing.cn",
     "api_key": "",
     "created_at": "2026-03-21T14:21:50.412104"
+  },
+  {
+    "name": "glm-5.1",
+    "api_url": "https://mydamoxing.cn",
+    "api_key": "sk-S0ntUoOeJU3aoUtMJ8G8R2lXXWB2MsVoLAndPmx3VtZHmCCz",
+    "created_at": "2026-04-18T18:01:12.991875"
   }
 ]

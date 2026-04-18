@@ -1,0 +1,17 @@
+{"id": "279f5f63-95b9-4a81-8a4a-cbdb796b0702", "filename": "3自然现象的跨学科解读.docx", "type": "DOCX"}
+{"id": "398e1afa-dd8e-4e52-857f-3705be68bc25", "filename": "高中交叉学科学习资料（方向一：数理+生物——生物统计学基础）对话式习题（含答案）.docx", "type": "DOCX"}
+{"id": "40c486f9-971e-4b67-8743-c44776725e92", "filename": "方向2-文本中的家国情怀与时代精神.docx", "type": "DOCX"}
+{"id": "59a1ec78-0724-4529-9816-9c7e2537e085", "filename": "高中交叉学科学习资料（方向二：文本中的家国情怀与时代精神）对话式习题（含答案）.docx", "type": "DOCX"}
+{"id": "630e95af-35aa-4688-8859-fb09172ea10e", "filename": "高中交叉学科学习资料（方向三：地理+生物+化学——生态环境与物质循环）对话式习题（含答案）.docx", "type": "DOCX"}
+{"id": "66b7b603-dbfc-4dc3-9059-d98b3172229b", "filename": "方向4-数据中的社会与地理规律.docx", "type": "DOCX"}
+{"id": "6f573c34-f88d-4bf9-86b2-b4de730adc1f", "filename": "方向3-涉及学科.txt", "type": "TXT"}
+{"id": "7284d96f-6ba4-40e8-9d0e-28f866da01ef", "filename": "方向1-生物统计学基础.docx", "type": "DOCX"}
+{"id": "87f26c00-775c-416b-b82a-1f62a1de68b9", "filename": "高中交叉学科学习资料（方向四：数学+物理+地理——自然地理中的数理应用）对话式习题（含答案）.docx", "type": "DOCX"}
+{"id": "907c79e7-d8f9-42cc-a3ba-f987c7c45518", "filename": "4数据中的社会与地理规律.docx", "type": "DOCX"}
+{"id": "9166da0c-e8fd-4f24-bb2c-4f573f02d407", "filename": "方向1-涉及学科.txt", "type": "TXT"}
+{"id": "ac4f309e-2c30-4595-8899-3e800bcd5f6d", "filename": "方向3-自然现象的跨学科解读.docx", "type": "DOCX"}
+{"id": "bcad865c-1537-4888-b8a6-65bafc19f19b", "filename": "方向4-涉及学科.txt", "type": "TXT"}
+{"id": "f0c1f949-e71b-4680-89e2-5c44aaefe385", "filename": "其他-生命活动中的物质与能量变化）对话式习题（含答案）.docx", "type": "DOCX"}
+{"id": "f35d915e-cc1f-4770-83fe-446a7b80a348", "filename": "方向2-涉及学科.txt", "type": "TXT"}
+{"id": "3b8cf2f3-d1ac-4d47-a7f1-7fc2280878af", "filename": "1生物统计学基础.docx", "type": "DOCX"}
+{"id": "8f5e64e6-f3bc-40af-b071-6851910262ef", "filename": "2文本中的家国情怀与时代精神.docx", "type": "DOCX"}

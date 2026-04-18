@@ -1,6 +1,25 @@
 /**
- * API请求工具 - 封装统一API调用
+ * API请求工具 - 封装统一API调用，支持JWT认证
  */
+async function parseResponse(response) {
+  const contentType = response.headers.get('content-type') || ''
+
+  if (contentType.includes('application/json')) {
+    return response.json()
+  }
+
+  const text = await response.text()
+  return { detail: text || '请求失败' }
+}
+
+function getAuthHeaders() {
+  const token = localStorage.getItem('auth_token')
+  if (token) {
+    return { 'Authorization': `Bearer ${token}` }
+  }
+  return {}
+}
+
 const api = {
   // 对话接口
   async postChat(prompt, stream = true, modelConfig = {}) {
@@ -27,7 +46,8 @@ const api = {
     const defaultOptions = {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json'
+        'Content-Type': 'application/json',
+        ...getAuthHeaders()
       },
       body: JSON.stringify(data)
     }
@@ -40,10 +60,10 @@ const api = {
       return response
     }
 
-    const result = await response.json()
+    const result = await parseResponse(response)
 
     if (!response.ok) {
-      throw new Error(result.error || '请求失败')
+      throw new Error(result.detail || result.error || '请求失败')
     }
 
     return result
@@ -51,11 +71,11 @@ const api = {
 
   // 通用GET请求
   async get(url) {
-    const response = await fetch(url)
-    const result = await response.json()
+    const response = await fetch(url, { headers: getAuthHeaders() })
+    const result = await parseResponse(response)
 
     if (!response.ok) {
-      throw new Error(result.error || '请求失败')
+      throw new Error(result.detail || result.error || '请求失败')
     }
 
     return result
@@ -122,13 +142,56 @@ const api = {
     const response = await fetch(`/api/documents/${docId}`, {
       method: 'DELETE'
     })
-    const result = await response.json()
+    const result = await parseResponse(response)
 
     if (!response.ok) {
-      throw new Error(result.detail || '删除失败')
+      throw new Error(result.detail || result.error || '删除失败')
     }
 
     return result
+  },
+
+  // AI智能结构化处理
+  async processKnowledgeAI(docId, provider = 'ollama', modelName = '', force = false) {
+    return this.post('/api/knowledge/process-ai', {
+      doc_id: docId,
+      provider,
+      model_name: modelName,
+      force
+    })
+  },
+
+  // 语义搜索
+  async semanticSearch(query, mode = 'hybrid', topK = 10, docIds = null) {
+    let url = `/api/search/semantic?q=${encodeURIComponent(query)}&mode=${mode}&top_k=${topK}`
+    if (docIds) url += `&doc_ids=${docIds.join(',')}`
+    return this.get(url)
+  },
+
+  // 生成向量嵌入
+  async indexEmbeddings(docId) {
+    return this.post('/api/embeddings/index', { doc_id: docId })
+  },
+
+  // 获取嵌入服务状态
+  async getEmbeddingStats() {
+    return this.get('/api/embeddings/stats')
+  },
+
+  // 学习进度
+  async getProgressDashboard() { return this.get('/api/progress/dashboard') },
+  async getDocumentProgress(docId) { return this.get(`/api/progress/document/${docId}`) },
+  async updateReadingProgress(docId, chunkIndex, timeSeconds) {
+    return this.post('/api/progress/reading', { document_id: docId, chunk_index: chunkIndex, time_seconds: timeSeconds })
+  },
+  async updateMastery(docId, pointText, delta = 0.1) {
+    return this.post('/api/progress/mastery', { document_id: docId, knowledge_point_text: pointText, delta })
+  },
+  async startStudySession(docId, sessionType = 'reading') {
+    return this.post('/api/progress/session/start', { document_id: docId, session_type: sessionType })
+  },
+  async endStudySession(sessionId) {
+    return this.post('/api/progress/session/end', { session_id: sessionId })
   }
 }
 

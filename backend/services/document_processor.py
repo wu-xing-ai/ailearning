@@ -39,7 +39,7 @@ class DocumentProcessor:
             'pdf': cls._extract_pdf,
             'docx': cls._extract_docx,
             'txt': cls._extract_txt,
-            'md': cls._extract_txt,  # md文件用txt方式处理
+            'md': cls._extract_txt,
             'xlsx': cls._extract_xlsx
         }
 
@@ -81,13 +81,28 @@ class DocumentProcessor:
     @staticmethod
     def _extract_txt(content: bytes) -> str:
         """提取TXT/MD内容"""
-        # 尝试多种编码
-        for encoding in ['utf-8', 'gbk', 'gb2312']:
+        candidates = ['utf-8-sig', 'utf-8', 'gb18030', 'gbk', 'gb2312']
+
+        def looks_garbled(text: str) -> bool:
+            if not text:
+                return False
+            bad_chars = text.count('�') + text.count('���')
+            mojibake_markers = text.count('锟') + text.count('鈥') + text.count('Ã')
+            return bad_chars > 0 or mojibake_markers > 0
+
+        for encoding in candidates:
             try:
-                return content.decode(encoding)
+                decoded = content.decode(encoding)
+                if not looks_garbled(decoded):
+                    return decoded
             except UnicodeDecodeError:
                 continue
-        return content.decode('utf-8', errors='ignore')
+
+        decoded = content.decode('utf-8', errors='replace')
+        if not looks_garbled(decoded):
+            return decoded
+
+        return content.decode('gb18030', errors='replace')
 
     @staticmethod
     def _extract_xlsx(content: bytes) -> str:
