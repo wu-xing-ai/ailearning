@@ -9,6 +9,7 @@ from .zhipu_service import ZhipuService
 from .qwen_service import QwenService
 from .siliconflow_service import SiliconFlowService
 from .custom_service import CustomService
+from .modelscope_service import ModelScopeService
 
 
 class AIServiceFactory:
@@ -22,6 +23,7 @@ class AIServiceFactory:
         "qwen": QwenService,
         "siliconflow": SiliconFlowService,
         "custom": CustomService,
+        "modelscope": ModelScopeService,
     }
 
     def __init__(self, default_provider: str = "ollama"):

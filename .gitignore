@@ -9,3 +9,12 @@ dist/
 
 # 环境变量和敏感 Key
 .env
+
+# Docker 数据目录
+backend/chroma_data/
+backend/custom_models.json
+
+# IDE
+.idea/
+.vscode/
+*.swp

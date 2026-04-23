@@ -1,7 +1,7 @@
 {
-  "provider": "ollama",
-  "model": "qwen2.5",
-  "base_url": "http://localhost:11434",
+  "provider": "custom",
+  "model": "glm-5.1",
+  "base_url": "",
   "api_keys": {
     "openai": "",
     "anthropic": "",
@@ -12,10 +12,22 @@
   },
   "custom_models": [
     {
-      "name": "Qwen/Qwen2.5-7B-Instruct",
-      "provider": "siliconflow",
-      "api_url": "https://api.siliconflow.cn/v1",
+      "name": "glm-5",
+      "provider": "custom",
+      "api_url": "https://open.bigmodel.cn/api/paas/v4",
       "api_key": ""
+    },
+    {
+      "name": "glm-5.1",
+      "provider": "custom",
+      "api_url": "https://open.bigmodel.cn/api/paas/v4",
+      "api_key": ""
+    },
+    {
+      "name": "MiniMax/MiniMax-M2.5",
+      "provider": "custom",
+      "api_url": "https://api-inference.modelscope.cn",
+      "api_key": "ms-4eeaabdf-6d4e-47bb-9c63-24492c7abd8f"
     }
   ]
 }

@@ -1,0 +1,56 @@
+services:
+  # MySQL 数据库
+  mysql:
+    image: mysql:8.0
+    container_name: ailearning-mysql
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ailearning123}
+      MYSQL_DATABASE: ailearning
+      MYSQL_CHARACTER_SET_SERVER: utf8mb4
+      MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
+    volumes:
+      - mysql_data:/var/lib/mysql
+    ports:
+      - "3306:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 后端 API
+  backend:
+    build: ./backend
+    container_name: ailearning-backend
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-ailearning123}@mysql:3306/ailearning?charset=utf8mb4
+      DOCKER_ENV: "true"
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
+      MODELSCOPE_API_KEY: ${MODELSCOPE_API_KEY:-ms-4eeaabdf-6d4e-47bb-9c63-24492c7abd8f}
+    volumes:
+      - ./backend/knowledge_base:/app/knowledge_base
+      - ./backend/chroma_data:/app/chroma_data
+      - ./backend/custom_models.json:/app/custom_models.json
+      - ./backend/ollama_config.json:/app/ollama_config.json
+    ports:
+      - "8000:8000"
+    depends_on:
+      mysql:
+        condition: service_healthy
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  # 前端
+  frontend:
+    build: ./frontend
+    container_name: ailearning-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      - backend
+
+volumes:
+  mysql_data:

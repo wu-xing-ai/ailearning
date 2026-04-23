@@ -1,0 +1,12 @@
+__pycache__
+*.pyc
+*.pyo
+.git
+.gitignore
+knowledge_base
+chroma_data
+ollama_config.json
+custom_models.json
+.env
+.venv
+venv

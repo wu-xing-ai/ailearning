@@ -42,9 +42,12 @@ app = FastAPI(
 )
 
 # 添加CORS中间件
+# Docker部署时允许所有来源，本地开发时只允许localhost
+import os
+allowed_origins = ["*"] if os.getenv("DOCKER_ENV") == "true" else ["http://localhost:5173"]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173"],
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -103,15 +106,20 @@ async def startup_event():
     init_db()
     print("数据库初始化完成")
 
-# 初始化Ollama服务
+# 初始化AI服务
 ollama_config = OllamaConfig()
-ollama_service = OllamaService(
-    model_name=ollama_config.model,
-    base_url=ollama_config.base_url
-)
 
-# 初始化AI服务工厂
-ai_factory = AIServiceFactory(default_provider="ollama")
+# Ollama服务（可选，连接失败不影响系统运行）
+try:
+    ollama_service = OllamaService(
+        model_name=ollama_config.model,
+        base_url=ollama_config.base_url
+    )
+except Exception:
+    ollama_service = None
+
+# 初始化AI服务工厂，默认使用自定义API
+ai_factory = AIServiceFactory(default_provider="custom")
 
 # 存储API密钥和自定义配置
 api_keys_storage = {}
@@ -330,16 +338,27 @@ async def chat_with_ai(request: dict):
         raise HTTPException(status_code=400, detail="prompt参数不能为空")
 
     # 确定使用哪个服务
-    provider = model_config.get("type", "ollama")
+    provider = model_config.get("type", "custom")
     model_name = model_config.get("name", ollama_config.model)
 
     try:
         # 根据配置获取或创建服务
         if provider == "ollama":
             # 使用Ollama服务
+            if ollama_service is None:
+                raise HTTPException(
+                    status_code=400,
+                    detail="Ollama服务未配置或不可用"
+                )
             service = ollama_service
             if model_name != service.model_name:
                 service.update_model(model_name)
+        elif provider == "modelscope":
+            # 官方免费模型，系统内置API Key，用户无需配置
+            service = factory.create_service(
+                provider="modelscope",
+                model_name=model_name,
+            )
         elif provider == "custom":
             # 使用自定义API
             service = factory.create_service(
@@ -351,7 +370,7 @@ async def chat_with_ai(request: dict):
         else:
             # 使用其他厂商服务
             api_key = model_config.get("apiKey") or api_keys_storage.get(provider)
-            if not api_key and provider != "ollama":
+            if not api_key:
                 raise HTTPException(
                     status_code=400,
                     detail=f"请先配置{provider}的API密钥"
@@ -460,11 +479,11 @@ async def reset_ai_context():
 @app.get("/api/ai/models")
 async def get_available_models():
     """获取可用的模型列表"""
-    current_provider = ollama_config.get_config().get("provider", "ollama")
+    current_provider = ollama_config.get_config().get("provider", "custom")
 
     try:
         models = []
-        if current_provider == "ollama":
+        if current_provider == "ollama" and ollama_service:
             models = await ollama_service.get_available_models()
         elif current_provider == "siliconflow":
             models = [
@@ -477,15 +496,14 @@ async def get_available_models():
 
         return {
             "models": models,
-            "current": ollama_config.get_config().get("model", ollama_service.model_name),
+            "current": ollama_config.get_config().get("model", ""),
             "provider": current_provider
         }
     except Exception as e:
-        # 如果获取失败，返回默认模型列表
         return {
-            "models": ["llama3.2", "llama3.1", "mistral", "qwen2"],
-            "current": ollama_service.model_name,
-            "provider": "ollama",
+            "models": [],
+            "current": "",
+            "provider": current_provider,
             "error": f"无法获取模型列表: {str(e)}"
         }
 
@@ -495,6 +513,8 @@ async def get_provider_models(provider: str):
     """获取指定厂商的模型列表"""
     try:
         if provider == "ollama":
+            if ollama_service is None:
+                raise HTTPException(status_code=400, detail="Ollama服务未配置")
             models = await ollama_service.get_available_models()
         else:
             # 创建临时服务实例获取模型列表
@@ -570,6 +590,11 @@ async def get_supported_providers():
             "name": "阿里通义千问",
             "requires_api_key": True,
             "default_models": ["qwen-turbo", "qwen-plus", "qwen-max"]
+        },
+        "modelscope": {
+            "name": "官方模型 (免费)",
+            "requires_api_key": False,
+            "default_models": ["MiniMax/MiniMax-M2.5"]
         },
         "custom": {
             "name": "自定义API",

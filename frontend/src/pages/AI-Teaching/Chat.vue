@@ -277,6 +277,7 @@ let messageIdCounter = 0
 // 厂商和模型选择
 const providers = ref([
   { value: 'ollama', label: 'Ollama本地' },
+  { value: 'modelscope', label: '官方模型' },
   { value: 'openai', label: 'OpenAI' },
   { value: 'anthropic', label: 'Claude' },
   { value: 'zhipu', label: '智谱AI' },
@@ -285,7 +286,7 @@ const providers = ref([
   { value: 'custom', label: '自定义' }
 ])
 
-const selectedProvider = ref('ollama')
+const selectedProvider = ref('modelscope')
 const selectedModel = ref('')
 const providerInfo = ref({})
 const apiKeys = ref({
@@ -319,6 +320,7 @@ const currentModels = computed(() => {
   if (models.length === 0) {
     const defaults = {
       ollama: [{ value: 'qwen2.5:latest', label: 'Qwen 2.5' }],
+      modelscope: [{ value: 'MiniMax/MiniMax-M2.5', label: 'MiniMax-M2.5 (免费)' }],
       openai: [{ value: 'gpt-3.5-turbo', label: 'GPT-3.5 Turbo' }],
       anthropic: [{ value: 'claude-3-sonnet-20240229', label: 'Claude 3 Sonnet' }],
       zhipu: [{ value: 'glm-4', label: 'GLM-4' }],
@@ -386,7 +388,8 @@ const quickAsk = (question) => {
 // 厂商变更
 const onProviderChange = async (provider) => {
   selectedModel.value = ''
-  if (provider !== 'ollama' && !apiKeys.value[provider]) {
+  // modelscope 不需要用户配置API密钥
+  if (provider !== 'ollama' && provider !== 'modelscope' && !apiKeys.value[provider]) {
     ElMessage.warning('请先在设置中配置API密钥')
   }
 }
@@ -541,15 +544,20 @@ const sendMessage = async () => {
   let requestConfig = {
     type: selectedProvider.value,
     name: selectedModel.value,
-    apiKey: apiKeys.value[selectedProvider.value] || '',
+    apiKey: '',
     apiUrl: undefined
   }
 
-  // 如果是自定义模型，使用该模型的独立配置
-  if (selectedProvider.value === 'custom' && customModelConfigs.value[selectedModel.value]) {
+  // 官方模型不需要用户传API Key
+  if (selectedProvider.value === 'modelscope') {
+    requestConfig.apiKey = ''
+  } else if (selectedProvider.value === 'custom' && customModelConfigs.value[selectedModel.value]) {
+    // 自定义模型使用该模型的独立配置
     const customConfig = customModelConfigs.value[selectedModel.value]
     requestConfig.apiKey = customConfig.apiKey || ''
     requestConfig.apiUrl = customConfig.apiUrl
+  } else {
+    requestConfig.apiKey = apiKeys.value[selectedProvider.value] || ''
   }
 
   const requestData = {
@@ -590,7 +598,8 @@ const sendMessage = async () => {
     messages.value[aiMsgIndex - 1].status = 'sent'
 
     // 处理流式响应
-    while (true) {
+    let streamDone = false
+    while (!streamDone) {
       const { done, value } = await reader.read()
       if (done) break
 
@@ -601,6 +610,12 @@ const sendMessage = async () => {
         if (line.startsWith('data: ')) {
           try {
             const data = JSON.parse(line.slice(6))
+            if (data.error) {
+              isWaitingForResponse.value = false
+              fullResponse += data.error
+              messages.value[aiMsgIndex].content = fullResponse
+              messages.value[aiMsgIndex].isError = true
+            }
             if (data.content) {
               // 收到第一个响应，关闭等待动画
               if (isWaitingForResponse.value) {
@@ -613,6 +628,7 @@ const sendMessage = async () => {
             }
             if (data.done) {
               messages.value[aiMsgIndex].isStreaming = false
+              streamDone = true
             }
           } catch (e) {
             // 忽略解析错误
@@ -620,6 +636,9 @@ const sendMessage = async () => {
         }
       }
     }
+
+    // 主动释放reader，确保连接关闭
+    try { reader.releaseLock() } catch (e) {}
 
     // 完成流式响应
     messages.value[aiMsgIndex].isStreaming = false
@@ -705,6 +724,10 @@ onMounted(async () => {
   await loadCustomModels()
 
   // 加载其他厂商默认模型
+  modelLists.value.modelscope = [
+    { value: 'MiniMax/MiniMax-M2.5', label: 'MiniMax-M2.5 (免费)' }
+  ]
+
   modelLists.value.openai = [
     { value: 'gpt-4', label: 'GPT-4' },
     { value: 'gpt-4-turbo', label: 'GPT-4 Turbo' },
@@ -737,8 +760,8 @@ onMounted(async () => {
     { value: 'meta-llama/Meta-Llama-3.1-8B-Instruct', label: 'Llama 3.1 8B' }
   ]
 
-  if (modelLists.value.ollama.length > 0) {
-    selectedModel.value = modelLists.value.ollama[0].value
+  if (modelLists.value.modelscope.length > 0) {
+    selectedModel.value = modelLists.value.modelscope[0].value
   }
 })
 
