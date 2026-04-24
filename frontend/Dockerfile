@@ -1,11 +1,15 @@
+# syntax=docker/dockerfile:1
 FROM node:20-alpine AS build
 WORKDIR /app
-# 使用阿里云 Alpine 镜像加速
-RUN sed -i 's/dl-cdn.alpinelinux.org/mirrors.aliyun.com/g' /etc/apk/repositories
-# 使用淘宝 npm 镜像加速
+
 RUN npm config set registry https://registry.npmmirror.com
+
 COPY package*.json ./
-RUN npm install --legacy-peer-deps
+
+# 使用 BuildKit 缓存 npm 下载，不用每次重新拉包
+RUN --mount=type=cache,target=/root/.npm \
+    npm install --legacy-peer-deps
+
 COPY . .
 RUN npm run build
 

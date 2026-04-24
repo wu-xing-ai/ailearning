@@ -10,9 +10,11 @@ from .chat_session import ChatSessionDB, ChatMessageDB
 from .learning_progress import LearningProgress
 from .knowledge_mastery import KnowledgeMastery
 from .study_session import StudySession
+from .embedding import EmbeddingVector
 
 __all__ = [
     "Document", "DocumentChunk", "DocumentStructure",
     "User", "ChatSessionDB", "ChatMessageDB",
     "LearningProgress", "KnowledgeMastery", "StudySession",
+    "EmbeddingVector",
 ]

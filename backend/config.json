@@ -29,5 +29,12 @@
       "api_url": "https://api-inference.modelscope.cn",
       "api_key": "ms-4eeaabdf-6d4e-47bb-9c63-24492c7abd8f"
     }
-  ]
+  ],
+  "embedding": {
+    "provider": "siliconflow",
+    "model": "BAAI/bge-large-zh-v1.5",
+    "api_url": "https://api.siliconflow.cn/v1",
+    "api_key": "sk-czvdsevxnjscuseffsgmottbrrgssvkuainizcwjeqqbctqc",
+    "dimensions": 1024
+  }
 }

@@ -21,7 +21,9 @@ services:
 
   # 后端 API
   backend:
-    build: ./backend
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
     container_name: ailearning-backend
     restart: unless-stopped
     environment:
@@ -34,6 +36,8 @@ services:
       - ./backend/chroma_data:/app/chroma_data
       - ./backend/custom_models.json:/app/custom_models.json
       - ./backend/ollama_config.json:/app/ollama_config.json
+      # pip 缓存持久化到宿主机
+      - pip_cache:/root/.cache/pip
     ports:
       - "8000:8000"
     depends_on:
@@ -44,9 +48,14 @@ services:
 
   # 前端
   frontend:
-    build: ./frontend
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
     container_name: ailearning-frontend
     restart: unless-stopped
+    volumes:
+      # npm 缓存持久化到宿主机
+      - npm_cache:/root/.npm
     ports:
       - "80:80"
     depends_on:
@@ -54,3 +63,5 @@ services:
 
 volumes:
   mysql_data:
+  pip_cache:
+  npm_cache:

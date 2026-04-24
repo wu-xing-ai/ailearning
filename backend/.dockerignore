@@ -10,3 +10,7 @@ custom_models.json
 .env
 .venv
 venv
+Dockerfile
+docker-compose.yml
+*.md
+tests

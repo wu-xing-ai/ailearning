@@ -67,14 +67,14 @@ import { Search } from '@element-plus/icons-vue'
 import api from '@/utils/api'
 
 const searchQuery = ref('')
-const searchMode = ref('hybrid')
+const searchMode = ref('keyword')
 const searching = ref(false)
 const hasSearched = ref(false)
 const searchResults = ref([])
 
 const searchModeOptions = [
-  { label: '混合搜索', value: 'hybrid' },
   { label: '关键词', value: 'keyword' },
+  { label: '混合搜索', value: 'hybrid' },
   { label: '语义', value: 'semantic' },
 ]
 

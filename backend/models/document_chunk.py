@@ -1,6 +1,7 @@
 """Document chunk model."""
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text, String
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.sql import func
 
 from core.database import Base
@@ -12,10 +13,10 @@ class DocumentChunk(Base):
     id = Column(Integer, primary_key=True, autoincrement=True)
     document_id = Column(String(36), ForeignKey("documents.id"), nullable=False, index=True)
     chunk_index = Column(Integer, nullable=False)
-    text = Column(Text, nullable=False)
+    text = Column(LONGTEXT, nullable=False)
     start_char = Column(Integer, nullable=True)
     end_char = Column(Integer, nullable=True)
-    meta = Column(Text, nullable=True)
+    meta = Column(LONGTEXT, nullable=True)
     embedding_id = Column(String(100), nullable=True)
     embedding_status = Column(String(20), default="pending")
 

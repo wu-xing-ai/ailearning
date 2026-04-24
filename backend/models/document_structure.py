@@ -4,6 +4,7 @@ Stores outline tree + knowledge points as JSON strings (rule-based v1).
 """
 
 from sqlalchemy import Column, DateTime, ForeignKey, Integer, Text, String
+from sqlalchemy.dialects.mysql import LONGTEXT
 from sqlalchemy.sql import func
 
 from core.database import Base
@@ -16,8 +17,8 @@ class DocumentStructure(Base):
     document_id = Column(String(36), ForeignKey("documents.id"), nullable=False, unique=True, index=True)
 
     version = Column(String(50), nullable=False)
-    outline_json = Column(Text, nullable=False)
-    knowledge_points_json = Column(Text, nullable=False)
+    outline_json = Column(LONGTEXT, nullable=False)
+    knowledge_points_json = Column(LONGTEXT, nullable=False)
 
     source = Column(String(20), default="rule")
     ai_model = Column(String(100), nullable=True)

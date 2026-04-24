@@ -50,7 +50,10 @@
         </div>
 
         <div class="tree-content" v-loading="loading">
-          <el-empty v-if="!loading && !outline" description="请选择文档并处理" />
+          <el-alert v-if="selectedDocError" type="error" :closable="false" show-icon style="margin-bottom: 12px">
+            {{ selectedDocError }}
+          </el-alert>
+          <el-empty v-if="!loading && !outline && !selectedDocError" description="请选择文档并处理" />
 
           <template v-else>
             <div class="tree-node">
@@ -133,6 +136,11 @@ const aiModelName = ref('')
 const selectedDocName = computed(() => {
   const d = documents.value.find(x => x.id === selectedDocId.value)
   return d?.filename || ''
+})
+
+const selectedDocError = computed(() => {
+  const d = documents.value.find(x => x.id === selectedDocId.value)
+  return d?.content_error || ''
 })
 
 const selectedPoints = computed(() => {

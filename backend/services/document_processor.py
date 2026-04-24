@@ -58,6 +58,35 @@ class DocumentProcessor:
         return content, type_names.get(file_type, file_type.upper())
 
     @staticmethod
+    def _fix_pdf_math_chars(text: str) -> str:
+        """修复PDF数学字体提取乱码 - 将错误映射的CJK字符还原为数学符号"""
+        math_font_map = {
+            # 小写字母
+            '犪': 'a',   '犫': 'b',   '犮': 'c',   '犱': 'd',
+            '犲': 'e',   '犳': 'f',   '犺': 'h',   '犻': 'i',
+            '犽': 'k',   '狀': 'n',   '狆': 'p',   '狇': 'q',
+            '狉': 'r',   '狊': 's',   '狋': 't',   '狓': 'x',
+            '狔': 'y',   '狌': 'u',
+            # 大写字母
+            '犃': 'A',   '犅': 'B',   '犆': 'C',   '犇': 'D',
+            '犉': 'F',   '犎': 'H',   '犔': 'L',   '犕': 'M',
+            '犖': 'N',   '犘': 'P',   '犙': 'Q',   '犚': 'R',
+            '犛': 'S',   '犜': 'T',   '犡': 'X',   '犢': 'Y',
+            # 小写字母（补充）
+            '犿': 'm',   '犍': 'k',   '狈': 'q',
+            # 旧映射（部分教材不同字体）
+            '犄': 'f',   '犟': 'i',   '猥': 'u',   '牲': 'y',
+            '犨': 'z',   '槿': '√',   '犬': 'e',
+            # 方程组大括号
+            '烄': '{',   '烆': '}',   '烌': '}',
+            # 条件概率竖线
+            '狘': '|',
+        }
+        for wrong, correct in math_font_map.items():
+            text = text.replace(wrong, correct)
+        return text
+
+    @staticmethod
     def _extract_pdf(content: bytes) -> str:
         """提取PDF内容"""
         import pdfplumber
@@ -67,6 +96,7 @@ class DocumentProcessor:
             for page in pdf.pages:
                 text = page.extract_text()
                 if text:
+                    text = DocumentProcessor._fix_pdf_math_chars(text)
                     text_parts.append(text)
         return '\n\n'.join(text_parts)
 

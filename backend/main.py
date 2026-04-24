@@ -1,6 +1,6 @@
-from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File
+from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File, BackgroundTasks
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
 from typing import List, Optional, Dict
 import uuid
@@ -11,6 +11,8 @@ import sys
 import shutil
 from urllib.parse import unquote
 from sqlalchemy import text
+import asyncio
+from concurrent.futures import ThreadPoolExecutor
 
 # 添加当前目录到路径
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
@@ -52,6 +54,36 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# PDF预览路由
+@app.get("/api/preview")
+async def get_document_preview(doc_id: str = Query(..., description="文档ID")):
+    """获取文档预览 - PDF返回第一页渲染图"""
+    db = next(get_db())
+    try:
+        document = db.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
+        if not document:
+            raise HTTPException(status_code=404, detail="文档不存在")
+        file_path = document.file_path
+        file_type = document.file_type
+        if file_type and file_type.lower() == 'pdf' and file_path and os.path.exists(file_path):
+            import fitz
+            pdf_doc = fitz.open(file_path)
+            if pdf_doc.page_count > 0:
+                page = pdf_doc[0]
+                mat = fitz.Matrix(150 / 72, 150 / 72)
+                pix = page.get_pixmap(matrix=mat)
+                img_bytes = pix.tobytes("png")
+                pdf_doc.close()
+                return Response(content=img_bytes, media_type="image/png")
+            pdf_doc.close()
+        raise HTTPException(status_code=404, detail="无预览")
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"预览生成失败: {str(e)}")
+    finally:
+        db.close()
 
 # 模拟数据库
 class Document(BaseModel):
@@ -99,6 +131,9 @@ def save_custom_models(models):
     with open(CUSTOM_MODELS_FILE, "w", encoding="utf-8") as f:
         json.dump(models, f, ensure_ascii=False, indent=2)
 
+# 线程池用于异步处理文件
+file_executor = ThreadPoolExecutor(max_workers=4)
+
 # 启动时初始化数据库
 @app.on_event("startup")
 async def startup_event():
@@ -129,16 +164,81 @@ api_keys_storage = {}
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
+def _process_file_background(doc_id: str, filename: str, file_type: str, content_bytes: bytes, file_path: str):
+    """后台处理文件：提取文本并更新数据库"""
+    db = next(get_db())
+    try:
+        text_content, file_type_name = DocumentProcessor.extract_content(
+            content_bytes, file_type, filename
+        )
+        document = DocumentModel(
+            id=doc_id,
+            filename=filename,
+            file_type=file_type_name,
+            content=text_content,
+            file_path=file_path,
+            processed=False
+        )
+        db.add(document)
+        db.commit()
+        print(f"[后台处理] 文件 {filename} 处理成功")
+    except Exception as e:
+        db.rollback()
+        error_msg = str(e)[:200]
+        print(f"[后台处理] 文件处理失败: {error_msg}")
+        try:
+            # 如果是列类型问题，尝试自动迁移后重试
+            if "Data too long" in error_msg:
+                from core.database import engine
+                from sqlalchemy import text as sql_text
+                with engine.connect() as conn:
+                    conn.execute(sql_text(
+                        "ALTER TABLE documents MODIFY COLUMN content LONGTEXT NULL"
+                    ))
+                    conn.commit()
+                print("[后台处理] 已自动迁移 content 列为 LONGTEXT，重试保存")
+                document = DocumentModel(
+                    id=doc_id,
+                    filename=filename,
+                    file_type=file_type_name if 'file_type_name' in dir() else file_type,
+                    content=text_content if 'text_content' in dir() else "",
+                    file_path=file_path,
+                    processed=False
+                )
+                db.add(document)
+                db.commit()
+                print(f"[后台处理] 重试成功: {filename}")
+                return
+        except Exception:
+            db.rollback()
+
+        # 最终兜底：记录空content，不再把错误信息写入content
+        try:
+            document = DocumentModel(
+                id=doc_id,
+                filename=filename,
+                file_type=file_type,
+                content="",
+                file_path=file_path,
+                processed=False
+            )
+            db.add(document)
+            db.commit()
+        except Exception as e2:
+            db.rollback()
+            print(f"[后台处理] 保存错误记录失败: {str(e2)[:100]}")
+    finally:
+        db.close()
+
+
 @app.post("/api/documents")
-async def upload_document(file: UploadFile = File(...)):
+async def upload_document(file: UploadFile = File(...), background_tasks: BackgroundTasks = None):
     """上传文档到知识库"""
     from sqlalchemy.orm import Session
 
     # 处理文件名编码（支持中文文件名）
     filename = file.filename
     try:
-        # 修复 Windows curl 等工具造成的编码问题
-        # 中文 UTF-8 字节被错误地解释为 latin-1，需要反转这个过程
         filename_bytes = filename.encode('latin-1')
         filename = filename_bytes.decode('utf-8')
     except (UnicodeDecodeError, UnicodeEncodeError):
@@ -151,21 +251,13 @@ async def upload_document(file: UploadFile = File(...)):
     if file_type == 'unknown':
         raise HTTPException(status_code=400, detail="不支持的文件格式，仅支持 PDF、DOCX、TXT、XLSX、MD")
 
-    # 2. 读取文件内容
-    content_bytes = await file.read()
-
-    # 3. 提取文本内容
-    try:
-        text_content, file_type_name = DocumentProcessor.extract_content(
-            content_bytes, file_type, filename
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"文件处理失败: {str(e)}")
-
-    # 4. 生成文档ID
+    # 2. 生成文档ID
     doc_id = str(uuid.uuid4())
 
-    # 5. 保存原始文件到 knowledge_base 目录
+    # 3. 读取文件内容
+    content_bytes = await file.read()
+
+    # 4. 保存原始文件到 knowledge_base 目录
     knowledge_base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge_base")
     doc_dir = os.path.join(knowledge_base_dir, doc_id)
     os.makedirs(doc_dir, exist_ok=True)
@@ -174,29 +266,19 @@ async def upload_document(file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         f.write(content_bytes)
 
-    # 6. 保存到数据库
-    db = next(get_db())
-    try:
-        document = DocumentModel(
-            id=doc_id,
-            filename=filename,
-            file_type=file_type_name,
-            content=text_content,
-            file_path=file_path,
-            processed=False
-        )
-        db.add(document)
-        db.commit()
-    finally:
-        db.close()
+    # 5. 后台异步处理文件提取和数据库写入
+    background_tasks.add_task(
+        _process_file_background, doc_id, filename, file_type, content_bytes, file_path
+    )
 
     return {
         "id": doc_id,
         "status": "uploaded",
         "filename": filename,
-        "file_type": file_type_name,
+        "file_type": file_type,
         "file_path": file_path
     }
+
 
 @app.get("/api/documents")
 async def get_documents():
@@ -277,19 +359,27 @@ async def delete_document(doc_id: str):
             conn.execute(text("DELETE FROM document_structures WHERE document_id = :doc_id"), {"doc_id": doc_id})
             conn.execute(text("DELETE FROM documents WHERE id = :doc_id"), {"doc_id": doc_id})
 
+        # 删除文件目录
         if os.path.exists(doc_dir):
-            shutil.rmtree(doc_dir)
+            try:
+                shutil.rmtree(doc_dir)
+                print(f"[删除] 成功删除文件目录: {doc_dir}")
+            except Exception as e:
+                print(f"[删除] 删除文件目录失败: {doc_dir}, 错误: {e}")
+        else:
+            print(f"[删除] 文件目录不存在: {doc_dir}")
 
         # Clean up ChromaDB vectors
         try:
             embedding_service.delete_document(doc_id)
-        except Exception:
-            pass
+        except Exception as e:
+            print(f"[删除] 清理嵌入向量失败: {e}")
 
         return {"status": "deleted", "id": doc_id}
     except HTTPException:
         raise
     except Exception as e:
+        print(f"[删除] 删除文档异常: {str(e)}")
         raise HTTPException(status_code=500, detail=f"删除文档失败: {str(e)}")
 
 @app.post("/api/chat/session")
@@ -681,6 +771,12 @@ async def process_knowledge(
             raise HTTPException(status_code=404, detail="文档不存在")
         if not document.content or not document.content.strip():
             raise HTTPException(status_code=400, detail="文档内容为空，无法结构化")
+        # 检测之前上传失败导致 content 存储了错误信息
+        if document.content.strip().startswith("[处理失败"):
+            raise HTTPException(
+                status_code=400,
+                detail="文档内容异常（上次上传时解析失败），请删除后重新上传该文档"
+            )
 
         existing = db.query(DocumentStructure).filter(DocumentStructure.document_id == doc_id).first()
         if existing and existing.version == STRUCTURE_VERSION and not force:
@@ -784,6 +880,12 @@ async def process_knowledge_ai(request: dict):
             raise HTTPException(status_code=404, detail="文档不存在")
         if not document.content or not document.content.strip():
             raise HTTPException(status_code=400, detail="文档内容为空，无法结构化")
+        # 检测之前上传失败导致 content 存储了错误信息
+        if document.content.strip().startswith("[处理失败"):
+            raise HTTPException(
+                status_code=400,
+                detail="文档内容异常（上次上传时解析失败），请删除后重新上传该文档"
+            )
 
         existing = db.query(DocumentStructure).filter(
             DocumentStructure.document_id == doc_id,

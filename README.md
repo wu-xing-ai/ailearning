@@ -9,22 +9,25 @@
 | 前端   | Vue.js 3 + TypeScript + Element Plus + Vite   |
 | 后端   | Python FastAPI + SQLAlchemy                   |
 | 数据库 | MySQL                                         |
-| AI模型 | Ollama / OpenAI / Anthropic / 智谱 / 通义千问 |
+| AI模型 | SiliconFlow / OpenAI / Anthropic / 智谱 / 通义千问 |
+| 向量搜索 | SiliconFlow Embedding API (BAAI/bge-large-zh-v1.5) |
 
 ## 主要功能
 
 ### AI智能导学
 
-- 🗨️ **智能聊天**: 与AI助手进行学习对话，支持多厂商模型切换
-- 🔍 **知识检索**: 快速查找相关知识内容
-- 📚 **知识交互**: 知识点学习和互动
+- **智能聊天**: 与AI助手进行学习对话，支持多厂商模型切换（MiniMax-M2.5、GLM-5等）
+- **智能检索**: 支持关键词搜索、语义搜索、混合搜索三种模式
+- **知识交互**: 知识点学习和互动
+- **学习进度**: 文档学习进度追踪、知识点掌握度分析
 
 ### 知识库管理
 
-- 📁 **文档上传**: 支持 PDF、DOCX、TXT、XLSX、MD 格式
-- 💾 **原始文件存储**: 自动保存原始文件到 knowledge_base 目录
-- 📊 **知识结构化**: 自动提取文档文本内容
-- 📋 **知识库管理**: 教学知识库的增删改查
+- **文档上传**: 支持 PDF、DOCX、TXT、XLSX、MD 格式
+- **原始文件存储**: 自动保存原始文件到 knowledge_base 目录
+- **知识结构化**: 自动提取文档文本内容，AI增强+规则双模式处理
+- **智能索引**: 文档自动分块并通过API生成向量索引，支持语义检索
+- **知识库管理**: 教学知识库的增删改查
 
 ## 项目结构
 
@@ -33,16 +36,24 @@ ailearning/
 ├── frontend/                    # 前端代码
 │   ├── src/
 │   │   ├── pages/              # 页面组件
+│   │   │   ├── AI-Teaching/    # AI导学相关页面
+│   │   │   │   ├── Search.vue  # 智能检索
+│   │   │   │   └── ...
+│   │   │   ├── SmartUpload.vue # 智能学习
+│   │   │   ├── Knowledge.vue   # 知识交互
+│   │   │   └── Settings.vue    # 系统设置
 │   │   ├── views/              # 布局和公共组件
 │   │   ├── router/             # 路由配置
 │   │   └── main.ts             # 入口文件
 │   ├── package.json
+│   ├── Dockerfile
 │   └── vite.config.ts
 │
 ├── backend/                     # 后端代码
 │   ├── main.py                 # FastAPI 主入口
-│   ├── config.json             # 配置文件
+│   ├── config.json             # 配置文件（API密钥、模型配置）
 │   ├── requirements.txt        # Python依赖
+│   ├── Dockerfile              # 多阶段构建，轻量化部署
 │   │
 │   ├── core/                   # 核心模块
 │   │   ├── config.py           # 配置管理
@@ -50,11 +61,18 @@ ailearning/
 │   │   └── stream_handler.py   # 流式响应处理
 │   │
 │   ├── models/                 # 数据模型
-│   │   └── document.py         # 文档模型
+│   │   ├── document.py         # 文档模型
+│   │   ├── document_chunk.py   # 文档分块模型
+│   │   ├── embedding.py        # 向量存储模型
+│   │   ├── user.py             # 用户模型
+│   │   ├── chat_session.py     # 聊天会话模型
+│   │   └── learning_progress.py # 学习进度模型
 │   │
 │   ├── services/               # 业务服务
 │   │   ├── ai_service.py       # AI服务
-│   │   └── document_processor.py  # 文档处理
+│   │   ├── embedding_service.py # 向量嵌入服务（API调用，无本地模型）
+│   │   ├── hybrid_search.py    # 混合检索服务
+│   │   └── document_processor.py # 文档处理
 │   │
 │   ├── ai_services/            # AI厂商服务
 │   │   ├── base.py             # 基类
@@ -70,7 +88,7 @@ ailearning/
 │       └── {doc_id}/           # 按文档ID分目录
 │           └── {filename}      # 原始文件
 │
-└── README.md
+└── docker-compose.yml          # Docker编排配置
 ```
 
 ## 环境要求
@@ -78,24 +96,15 @@ ailearning/
 | 组件    | 版本要求                    |
 | ------- | --------------------------- |
 | Node.js | 18+                         |
-| Python  | 3.8+                        |
+| Python  | 3.10+                       |
 | MySQL   | 5.7+                        |
-| Ollama  | 最新版 (可选，用于本地模型) |
+| Docker  | 20+（可选，用于容器化部署） |
 
 ## 快速开始
 
-### 1. 安装 Ollama (可选)
+### 方式一：本地开发
 
-```powershell
-# Windows PowerShell
-irm https://ollama.com/install.ps1 | iex
-
-# 下载模型
-ollama pull qwen2.5
-ollama run qwen2.5
-```
-
-### 2. 安装依赖
+#### 1. 安装依赖
 
 ```bash
 # 前端
@@ -107,7 +116,7 @@ cd backend
 pip install -r requirements.txt
 ```
 
-### 3. 配置数据库
+#### 2. 配置数据库
 
 创建 MySQL 数据库：
 
@@ -117,22 +126,53 @@ CREATE DATABASE ailearning CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 修改 `backend/core/database.py` 中的数据库连接信息。
 
-### 4. 启动服务
+#### 3. 配置API密钥
+
+编辑 `backend/config.json`，填入你的API密钥：
+
+```json
+{
+  "provider": "custom",
+  "model": "glm-5.1",
+  "embedding": {
+    "provider": "siliconflow",
+    "model": "BAAI/bge-large-zh-v1.5",
+    "api_url": "https://api.siliconflow.cn/v1",
+    "api_key": "你的SiliconFlow API Key",
+    "dimensions": 1024
+  }
+}
+```
+
+#### 4. 启动服务
 
 ```bash
 # 启动后端 (端口 8000)
 cd backend
-python main.py
-# 或
 uvicorn main:app --reload --host 0.0.0.0 --port 8000
 
 # 启动前端 (端口 5173)
 cd frontend
 npm run dev
 ```
-  - 用户名: admin                                                                                                                                                 
-  - 密码: admin123 
-### 5. 访问应用
+
+### 方式二：Docker 部署
+
+```bash
+# 一键启动所有服务
+docker-compose up -d --build
+```
+
+启动后访问：
+- 前端界面: http://localhost
+- 后端API: http://localhost:8000
+
+#### 登录信息
+
+- 用户名: admin
+- 密码: admin123
+
+### 访问应用
 
 - 前端界面: http://localhost:5173
 - API文档: http://localhost:8000/docs
@@ -142,21 +182,28 @@ npm run dev
 
 | 厂商        | 是否需要API Key | 说明                |
 | ----------- | --------------- | ------------------- |
-| Ollama      | 否              | 本地部署，免费      |
+| SiliconFlow | 是              | 多种开源模型，免费额度 |
 | OpenAI      | 是              | GPT系列模型         |
 | Anthropic   | 是              | Claude系列模型      |
 | 智谱AI      | 是              | GLM系列模型         |
 | 通义千问    | 是              | Qwen系列模型        |
-| SiliconFlow | 是              | 多种开源模型        |
 | 自定义      | 是              | 兼容OpenAI格式的API |
+
+## 向量搜索说明
+
+语义搜索通过API实现，无需本地部署模型：
+
+- **Embedding模型**: `BAAI/bge-large-zh-v1.5`（通过 SiliconFlow API 调用）
+- **向量存储**: MySQL数据库（`embedding_vectors` 表）
+- **搜索模式**: 关键词搜索（默认）、语义搜索、混合搜索（RRF融合）
 
 ---
 
-## 📖 后端接口文档
+## 后端接口文档
 
 详细的API接口文档请查看 **[inter.md](inter.md)**
 
-## ⚙️ 配置文件
+## 配置文件
 
 API密钥等配置存储在 **[backend/config.json](backend/config.json)**
 
@@ -177,9 +224,13 @@ API密钥等配置存储在 **[backend/config.json](backend/config.json)**
 - [X] 自定义API模型接入
 - [X] API错误处理优化
 - [X] 知识结构化处理 (AI增强+规则双模式)
-- [X] 向量检索优化 (ChromaDB+语义搜索+混合检索)
+- [X] 语义搜索 (API向量嵌入 + MySQL向量存储)
+- [X] 混合检索 (关键词+语义 RRF融合)
 - [X] 用户权限管理 (JWT认证+RBAC角色控制)
 - [X] 学习进度追踪 (文档进度+知识点掌握度+学习会话)
+- [X] Docker容器化部署 (多阶段构建，轻量化)
+- [X] 默认关键词搜索模式
+- [X] PDF文档预览 (知识交互界面显示PDF第一页)
 
 ### 计划中
 

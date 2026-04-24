@@ -15,7 +15,8 @@
         <el-table-column prop="file_type" label="类型" width="100"></el-table-column>
         <el-table-column prop="status" label="状态" width="100">
           <template #default="{ row }">
-            <el-tag :type="row.processed ? 'success' : 'warning'">
+            <el-tag v-if="row.content_error" type="danger">异常</el-tag>
+            <el-tag v-else :type="row.processed ? 'success' : 'warning'">
               {{ row.processed ? '已处理' : '待处理' }}
             </el-tag>
           </template>
