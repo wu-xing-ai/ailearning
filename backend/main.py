@@ -5,6 +5,7 @@ from pydantic import BaseModel
 from typing import List, Optional, Dict
 import uuid
 import json
+import re
 from datetime import datetime
 import os
 import sys
@@ -56,6 +57,47 @@ app.add_middleware(
 )
 
 # PDF预览路由
+
+
+def _clean_knowledge_points(points):
+    """清理知识点中的VL模型标记和乱码文本"""
+    import re as _re
+    for kp in points:
+        if isinstance(kp, dict) and "text" in kp:
+            # 移除VL模型识别标记（包括乱码版本）
+            kp["text"] = _re.sub(r'\[VL[^\]]*\]\s*', '', kp["text"])
+            # 移除残留的PUA字符和孤立代理对（无法正常显示的字符）
+            cleaned = []
+            for ch in kp["text"]:
+                cp = ord(ch)
+                # 跳过PUA范围
+                if 0xE000 <= cp <= 0xF8FF:
+                    continue
+                # 跳过孤立代理对
+                if 0xDC00 <= cp <= 0xDFFF:
+                    continue
+                if 0xD800 <= cp <= 0xDBFF:
+                    continue
+                cleaned.append(ch)
+            kp["text"] = ''.join(cleaned)
+            # 清理多余空白
+            kp["text"] = _re.sub(r'\s+', ' ', kp["text"]).strip()
+        if isinstance(kp, dict) and "summary" in kp and kp["summary"]:
+            kp["summary"] = _re.sub(r'\[VL[^\]]*\]\s*', '', str(kp["summary"]))
+            summary_cleaned = []
+            for ch in kp["summary"]:
+                cp = ord(ch)
+                if 0xE000 <= cp <= 0xF8FF:
+                    continue
+                if 0xDC00 <= cp <= 0xDFFF:
+                    continue
+                if 0xD800 <= cp <= 0xDBFF:
+                    continue
+                summary_cleaned.append(ch)
+            kp["summary"] = ''.join(summary_cleaned)
+            kp["summary"] = _re.sub(r'\s+', ' ', kp["summary"]).strip()
+
+
 @app.get("/api/preview")
 async def get_document_preview(doc_id: str = Query(..., description="文档ID")):
     """获取文档预览 - PDF返回第一页渲染图"""
@@ -164,12 +206,12 @@ api_keys_storage = {}
 async def health_check():
     return {"status": "healthy", "timestamp": datetime.now().isoformat()}
 
-def _process_file_background(doc_id: str, filename: str, file_type: str, content_bytes: bytes, file_path: str):
+def _process_file_background(doc_id: str, filename: str, file_type: str, file_path: str):
     """后台处理文件：提取文本并更新数据库"""
     db = next(get_db())
     try:
-        text_content, file_type_name = DocumentProcessor.extract_content(
-            content_bytes, file_type, filename
+        text_content, file_type_name = DocumentProcessor.extract_from_file(
+            file_path, file_type, filename
         )
         document = DocumentModel(
             id=doc_id,
@@ -254,21 +296,23 @@ async def upload_document(file: UploadFile = File(...), background_tasks: Backgr
     # 2. 生成文档ID
     doc_id = str(uuid.uuid4())
 
-    # 3. 读取文件内容
-    content_bytes = await file.read()
-
-    # 4. 保存原始文件到 knowledge_base 目录
+    # 3. 流式保存文件到磁盘（避免一次性读取大文件撑爆内存）
     knowledge_base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge_base")
     doc_dir = os.path.join(knowledge_base_dir, doc_id)
     os.makedirs(doc_dir, exist_ok=True)
 
     file_path = os.path.join(doc_dir, filename)
     with open(file_path, "wb") as f:
-        f.write(content_bytes)
+        chunk_size = 1024 * 1024  # 1MB
+        while True:
+            chunk = await file.read(chunk_size)
+            if not chunk:
+                break
+            f.write(chunk)
 
-    # 5. 后台异步处理文件提取和数据库写入
+    # 4. 后台异步处理文件提取和数据库写入（从磁盘读取，不占请求内存）
     background_tasks.add_task(
-        _process_file_background, doc_id, filename, file_type, content_bytes, file_path
+        _process_file_background, doc_id, filename, file_type, file_path
     )
 
     return {
@@ -289,7 +333,7 @@ async def get_documents():
     try:
         documents = db.query(DocumentModel).order_by(DocumentModel.created_at.desc()).all()
         return JSONResponse(
-            content=[doc.to_dict() for doc in documents],
+            content=[doc.to_dict(include_content=False) for doc in documents],
             media_type="application/json; charset=utf-8"
         )
     finally:
@@ -769,6 +813,24 @@ async def process_knowledge(
         document = db.query(DocumentModel).filter(DocumentModel.id == doc_id).first()
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
+
+        # 如果force且有原始文件，先尝试重新提取内容（支持VL增强）
+        if force and document.file_path and os.path.exists(document.file_path):
+            file_type = DocumentProcessor.get_file_type(document.filename)
+            if file_type == 'pdf':
+                try:
+                    result = await asyncio.to_thread(
+                        DocumentProcessor.extract_from_file, document.file_path, 'pdf', document.filename
+                    )
+                    new_content = result[0]
+                    if new_content and new_content.strip():
+                        document.content = new_content
+                        db.commit()
+                except Exception as e:
+                    import traceback
+                    print(f"[重新提取] VL增强失败: {e}")
+                    traceback.print_exc()
+
         if not document.content or not document.content.strip():
             raise HTTPException(status_code=400, detail="文档内容为空，无法结构化")
         # 检测之前上传失败导致 content 存储了错误信息
@@ -840,11 +902,25 @@ async def process_knowledge(
 @app.get("/api/knowledge/structure")
 async def get_knowledge_structure(doc_id: str = Query(..., description="文档ID")):
     """获取文档结构化结果"""
+    from services.document_processor import DocumentProcessor
     db = next(get_db())
     try:
         structure = db.query(DocumentStructure).filter(DocumentStructure.document_id == doc_id).first()
         if not structure:
             raise HTTPException(status_code=404, detail="结构化结果不存在，请先处理文档")
+
+        # 修复已存储数据中的PDF数学字体乱码
+        outline_raw = DocumentProcessor._fix_pdf_math_chars(structure.outline_json)
+
+        # 先在原始JSON中移除VL标记（避免_fix_pdf_math_chars将标记中的CJK字符错误转换）
+        kp_json_cleaned = re.sub(r'\[VL[^\]]{0,50}\]\s*', '', structure.knowledge_points_json)
+        kp_raw = DocumentProcessor._fix_pdf_math_chars(kp_json_cleaned)
+
+        outline_data = json.loads(outline_raw)
+        kp_data = json.loads(kp_raw)
+
+        # 清理知识点中的残留VL标记和乱码
+        _clean_knowledge_points(kp_data)
 
         return JSONResponse(
             content={
@@ -852,8 +928,8 @@ async def get_knowledge_structure(doc_id: str = Query(..., description="文档ID
                 "version": structure.version,
                 "source": structure.source,
                 "ai_model": structure.ai_model,
-                "outline": json.loads(structure.outline_json),
-                "knowledge_points": json.loads(structure.knowledge_points_json),
+                "outline": outline_data,
+                "knowledge_points": kp_data,
                 "updated_at": structure.updated_at.isoformat() if structure.updated_at else None,
             },
             media_type="application/json; charset=utf-8"

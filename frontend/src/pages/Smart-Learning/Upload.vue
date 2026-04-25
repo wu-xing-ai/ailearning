@@ -28,7 +28,7 @@
           <el-tag size="small" type="info">TXT</el-tag>
           <el-tag size="small" type="info">MD</el-tag>
         </div>
-        <span class="drop-zone__limit">单个文件最大 50MB，最多 20 个文件</span>
+        <span class="drop-zone__limit">单个文件最大 50MB，最多 3 个文件</span>
       </div>
       <input
         ref="fileInputRef"
@@ -124,7 +124,7 @@ import api from '@/utils/api'
 
 const acceptTypes = '.pdf,.docx,.txt,.xlsx,.md'
 const maxFileSize = 50 * 1024 * 1024 // 50MB
-const maxFiles = 20
+const maxFiles = 3
 
 const fileInputRef = ref(null)
 const isDragging = ref(false)

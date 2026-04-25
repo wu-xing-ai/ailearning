@@ -3,18 +3,34 @@
     <!-- 顶部导航 -->
     <header class="header">
       <div class="header-content">
-        <div class="logo">
-          <div class="logo-icon">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-              <path d="M4.26 10.147a60.436 60.436 0 00-.491 3.007 60.453 60.453 0 00-1.265 3.96c-.165.377-.318.756-.458 1.147l-.012.033A10.5 10.5 0 016.5 6.5c.965 0 1.91.127 2.812.367M12 6.5c0 3.59 2.91 6.5 6.5 6.5.795 0 1.56-.09 2.29-.257M12 6.5a6.5 6.5 0 016.5-6.5c2.393 0 4.538 1.086 5.934 2.782M12 6.5c0-3.59 2.91-6.5 6.5-6.5 2.393 0 4.538 1.086 5.934 2.782"/>
-            </svg>
+        <div class="header-row">
+          <div class="logo">
+            <div class="logo-icon">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M4.26 10.147a60.436 60.436 0 00-.491 3.007 60.453 60.453 0 00-1.265 3.96c-.165.377-.318.756-.458 1.147l-.012.033A10.5 10.5 0 016.5 6.5c.965 0 1.91.127 2.812.367M12 6.5c0 3.59 2.91 6.5 6.5 6.5.795 0 1.56-.09 2.29-.257M12 6.5a6.5 6.5 0 016.5-6.5c2.393 0 4.538 1.086 5.934 2.782M12 6.5c0-3.59 2.91-6.5 6.5-6.5 2.393 0 4.538 1.086 5.934 2.782"/>
+              </svg>
+            </div>
+            <div class="logo-text">
+              <span class="school-name">武汉外国语学校</span>
+              <span class="platform-name">智能学习平台</span>
+            </div>
           </div>
-          <div class="logo-text">
-            <span class="school-name">武汉外国语学校</span>
-            <span class="platform-name">智能学习平台</span>
+          <div class="header-right">
+            <div class="user-info desktop-only" v-if="authStore.isAuthenticated">
+              <span class="user-name">{{ authStore.user?.display_name || authStore.user?.username }}</span>
+              <el-tag size="small" :type="roleTagType">{{ roleLabel }}</el-tag>
+              <el-button text @click="handleLogout" class="logout-btn">退出</el-button>
+            </div>
+            <!-- 移动端汉堡菜单按钮 -->
+            <button class="hamburger-btn" :class="{ active: mobileMenuOpen }" @click="toggleMobileMenu">
+              <span></span>
+              <span></span>
+              <span></span>
+            </button>
           </div>
         </div>
-        <nav class="nav">
+        <!-- 桌面端导航 -->
+        <nav class="nav desktop-only">
           <router-link
             v-for="item in visibleNavItems"
             :key="item.path"
@@ -26,12 +42,30 @@
             <span class="nav-label">{{ item.label }}</span>
           </router-link>
         </nav>
-        <div class="user-info" v-if="authStore.isAuthenticated">
-          <span class="user-name">{{ authStore.user?.display_name || authStore.user?.username }}</span>
-          <el-tag size="small" :type="roleTagType">{{ roleLabel }}</el-tag>
-          <el-button text @click="handleLogout" class="logout-btn">退出</el-button>
-        </div>
       </div>
+      <!-- 移动端下拉菜单 -->
+      <transition name="slide-down">
+        <div class="mobile-menu" v-if="mobileMenuOpen">
+          <nav class="mobile-nav">
+            <router-link
+              v-for="item in visibleNavItems"
+              :key="item.path"
+              :to="item.path"
+              class="mobile-nav-item"
+              :class="{ active: $route.path === item.path }"
+              @click="mobileMenuOpen = false"
+            >
+              <span class="nav-icon" v-html="item.icon"></span>
+              <span class="nav-label">{{ item.label }}</span>
+            </router-link>
+          </nav>
+          <div class="mobile-user" v-if="authStore.isAuthenticated">
+            <span class="user-name">{{ authStore.user?.display_name || authStore.user?.username }}</span>
+            <el-tag size="small" :type="roleTagType">{{ roleLabel }}</el-tag>
+            <el-button text @click="handleLogout" class="logout-btn">退出</el-button>
+          </div>
+        </div>
+      </transition>
     </header>
 
     <!-- 主要内容区 -->
@@ -46,13 +80,23 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useAuthStore } from '@/stores/auth'
 
 const $route = useRoute()
 const router = useRouter()
 const authStore = useAuthStore()
+const mobileMenuOpen = ref(false)
+
+const toggleMobileMenu = () => {
+  mobileMenuOpen.value = !mobileMenuOpen.value
+}
+
+// 路由变化时关闭移动端菜单
+watch(() => $route.path, () => {
+  mobileMenuOpen.value = false
+})
 
 const allNavItems = ref([
   {
@@ -133,7 +177,6 @@ const handleLogout = () => {
   background: linear-gradient(135deg, #3D2914 0%, #5D4037 50%, #4A3728 100%);
   color: white;
   position: relative;
-  overflow: hidden;
 }
 
 .header::before {
@@ -151,10 +194,18 @@ const handleLogout = () => {
   position: relative;
   z-index: 1;
   padding: 0 24px;
+}
+
+.header-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  flex-wrap: wrap;
+}
+
+.header-right {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 /* ========== Logo 区域 ========== */
@@ -331,8 +382,123 @@ const handleLogout = () => {
   }
 }
 
+/* ========== 汉堡菜单按钮 ========== */
+.hamburger-btn {
+  display: none;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  gap: 5px;
+  width: 36px;
+  height: 36px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 8px;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.2s;
+}
+
+.hamburger-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.hamburger-btn span {
+  display: block;
+  width: 18px;
+  height: 2px;
+  background: rgba(255, 249, 232, 0.85);
+  border-radius: 2px;
+  transition: all 0.3s ease;
+}
+
+.hamburger-btn.active span:nth-child(1) {
+  transform: rotate(45deg) translate(5px, 5px);
+}
+
+.hamburger-btn.active span:nth-child(2) {
+  opacity: 0;
+}
+
+.hamburger-btn.active span:nth-child(3) {
+  transform: rotate(-45deg) translate(5px, -5px);
+}
+
+/* ========== 移动端下拉菜单 ========== */
+.mobile-menu {
+  padding: 8px 16px 16px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(180deg, rgba(61, 41, 20, 0.5) 0%, rgba(74, 55, 40, 0.3) 100%);
+}
+
+.mobile-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobile-nav-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: rgba(255, 255, 255, 0.75);
+  text-decoration: none;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 500;
+  transition: all 0.2s ease;
+}
+
+.mobile-nav-item:hover,
+.mobile-nav-item.active {
+  color: white;
+  background: rgba(212, 165, 116, 0.2);
+}
+
+.mobile-user {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  margin-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 249, 232, 0.85);
+  font-size: 14px;
+}
+
+/* 移动端菜单下拉动画 */
+.slide-down-enter-active {
+  animation: slideDown 0.25s ease-out;
+}
+
+.slide-down-leave-active {
+  animation: slideDown 0.2s ease-in reverse;
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+  }
+  to {
+    opacity: 1;
+    max-height: 500px;
+  }
+}
+
 /* ========== 响应式调整 ========== */
 @media (max-width: 768px) {
+  .desktop-only {
+    display: none !important;
+  }
+
+  .hamburger-btn {
+    display: flex;
+  }
+
   .header-content {
     padding: 0 16px;
   }
@@ -355,23 +521,8 @@ const handleLogout = () => {
     font-size: 12px;
   }
 
-  .nav {
-    gap: 2px;
-    padding: 6px 0 10px;
-  }
-
-  .nav-item {
-    padding: 8px 12px;
-    font-size: 13px;
-  }
-
-  .nav-icon {
-    width: 16px;
-    height: 16px;
-  }
-
   .main-content {
-    padding: 16px;
+    padding: 12px;
   }
 }
 </style>

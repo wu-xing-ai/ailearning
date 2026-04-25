@@ -17,6 +17,8 @@ class Chunk:
 
 def normalize_text(text: str) -> str:
     text = (text or "").replace("\r\n", "\n").replace("\r", "\n")
+    # 移除VL模型识别标记前缀（如 [VL模型识别]、[VL模型识别参考 - 用于辅助理解] 等）
+    text = re.sub(r'\[VL模型识别[^\]]*\]\s*', '', text)
     # collapse 3+ newlines into 2
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
@@ -202,12 +204,22 @@ def extract_knowledge_points(chunks: List[Chunk], outline: Dict[str, Any]) -> Li
     seen = set()
 
     bullet_re = re.compile(r"^\s*(?:[-*•]|\d+\)|\d+[\.、]\s*|（\d+）)\s+(.+)$")
-    trigger_re = re.compile(r"^(?:定义|注意|提示|结论|优点|缺点|适用场景)[:：]\s*(.+)$")
+    trigger_re = re.compile(r"^(?:定义|注意|提示|结论|优点|缺点|适用场景|定理|公式|性质|推论|引理)[:：]\s*(.+)$")
     summary_re = re.compile(r"^(?:包含以下内容|主要内容|重点内容)[:：]\s*(.*)$")
+
+    # 数学教材专用模式
+    # 定理/公式/定义声明
+    theorem_re = re.compile(r"^(?:定理|定义|公理|公式|性质|推论|引理|法则|原理)\s*(\d*\.?\d*)\s*[:：]?\s*(.{4,150})")
+    # 例题
+    example_re = re.compile(r"^例\s*(\d+)\s*[\.．]?\s*(.{4,150})")
+    # "一般地"等引出定义的句式
+    definition_re = re.compile(r"^一般地[，,]?\s*(.{10,150})")
+    # "如果...那么"型定理
+    conditional_re = re.compile(r"^如果\s*(.{5,80}?)\s*(?:，|，)?\s*那么\s*(.{5,80})")
 
     def add_point(text: str, point_type: str, chunk_index: int, node_path: List[str]):
         text = re.sub(r"\s+", " ", text).strip("：:;；，,。. ")
-        if not (4 <= len(text) <= 200):
+        if not (4 <= len(text) <= 300):
             return
         key = (point_type, text)
         if key in seen:
@@ -235,6 +247,37 @@ def extract_knowledge_points(chunks: List[Chunk], outline: Dict[str, Any]) -> Li
             if m:
                 add_point(m.group(1), "trigger", ch.index, node_path)
 
+        # 数学专用: 定理/定义/公式
+        for ln in lines:
+            m = theorem_re.match(ln)
+            if m:
+                label = m.group(1)
+                content = m.group(2).strip()
+                if label:
+                    add_point(f"{label} {content}", "theorem", ch.index, node_path)
+                else:
+                    add_point(content, "theorem", ch.index, node_path)
+
+        # 数学专用: 例题
+        for ln in lines:
+            m = example_re.match(ln)
+            if m:
+                num = m.group(1)
+                content = m.group(2).strip()
+                add_point(f"例{num}: {content}", "example", ch.index, node_path)
+
+        # 数学专用: "一般地"引导的定义
+        for ln in lines:
+            m = definition_re.match(ln)
+            if m:
+                add_point(m.group(1), "definition", ch.index, node_path)
+
+        # 数学专用: 条件式定理
+        for ln in lines:
+            m = conditional_re.match(ln)
+            if m:
+                add_point(f"如果{m.group(1)}，那么{m.group(2)}", "theorem", ch.index, node_path)
+
         for i, ln in enumerate(lines):
             m = summary_re.match(ln)
             if not m:
@@ -260,7 +303,7 @@ def extract_knowledge_points(chunks: List[Chunk], outline: Dict[str, Any]) -> Li
             node_path = path_for_chunk(ch.index)
             sentences = [s.strip() for s in re.split(r"(?<=[。！？!?；;])\s*", ch.text) if s.strip()]
             for s in sentences[:3]:
-                if 8 <= len(s) <= 200:
+                if 8 <= len(s) <= 300:
                     add_point(s, "concept", ch.index, node_path)
 
     return points

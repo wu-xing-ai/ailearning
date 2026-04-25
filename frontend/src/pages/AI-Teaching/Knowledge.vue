@@ -3,7 +3,7 @@
     <div class="header">
       <h2>知识交互</h2>
       <div class="header-actions">
-        <el-select v-model="selectedDocId" placeholder="选择知识库文档" style="width: 260px" @change="onDocChange">
+        <el-select v-model="selectedDocId" placeholder="选择知识库文档" class="doc-select" @change="onDocChange">
           <el-option v-for="d in documents" :key="d.id" :label="d.filename" :value="d.id" />
         </el-select>
         <el-dropdown split-button type="primary" :loading="processing" :disabled="!selectedDocId" @click="processSelected">
@@ -136,7 +136,7 @@
                   @click="activePointIdx = idx"
                 >
                   <el-tag :type="pointTagType(kp.type)" size="small" effect="plain">{{ pointTypeLabel(kp.type) }}</el-tag>
-                  <span class="point-text">{{ kp.text }}</span>
+                  <span class="point-text" v-html="renderLatexText(kp.text)"></span>
                 </div>
               </div>
             </el-scrollbar>
@@ -213,6 +213,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Folder, ZoomIn, Document, Tickets, Notebook, Reading } from '@element-plus/icons-vue'
 import api from '@/utils/api'
+import { renderLatexText } from '@/utils/latex'
 import OutlineNode from '@/views/OutlineNode.vue'
 
 const route = useRoute()
@@ -921,5 +922,64 @@ onMounted(async () => {
 /* Empty 样式 */
 :deep(.el-empty__description) {
   color: #8B7355;
+}
+
+/* ========== 响应式 ========== */
+.doc-select {
+  width: 260px;
+}
+
+@media (max-width: 768px) {
+  .knowledge-container {
+    padding: 12px;
+    border-radius: 8px;
+  }
+
+  .header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  .header h2 {
+    font-size: 18px;
+  }
+
+  .header-actions {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+
+  .doc-select {
+    width: 100%;
+  }
+
+  .knowledge-content {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .knowledge-left-panel {
+    width: 100%;
+    min-width: 0;
+  }
+
+  .knowledge-detail {
+    padding: 16px;
+  }
+
+  .detail-header h3 {
+    font-size: 15px;
+  }
+
+  .point-card {
+    max-width: 100%;
+  }
+
+  .detail-footer {
+    flex-wrap: wrap;
+    gap: 12px;
+  }
 }
 </style>

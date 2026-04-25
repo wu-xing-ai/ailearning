@@ -6,6 +6,7 @@ import httpx
 import json
 from typing import AsyncGenerator, Dict, List
 from .base import BaseAIService
+from core.app_config import get_api_url
 
 
 class SiliconFlowService(BaseAIService):
@@ -22,10 +23,11 @@ class SiliconFlowService(BaseAIService):
         self,
         model_name: str = "Qwen/Qwen2.5-7B-Instruct",
         api_key: str = None,
-        api_url: str = "https://api.siliconflow.cn/v1",
+        api_url: str = None,
         **kwargs
     ):
-        super().__init__(model_name, api_key, api_url, **kwargs)
+        effective_api_url = api_url or get_api_url("siliconflow")
+        super().__init__(model_name, api_key, effective_api_url, **kwargs)
 
     async def chat_completion(
         self,

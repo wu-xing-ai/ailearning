@@ -8,7 +8,17 @@
     "zhipu": "",
     "qwen": "",
     "siliconflow": "",
-    "custom": ""
+    "custom": "",
+    "modelscope": ""
+  },
+  "api_urls": {
+    "openai": "https://api.openai.com/v1",
+    "anthropic": "https://api.anthropic.com",
+    "zhipu": "https://open.bigmodel.cn/api/paas/v4",
+    "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "siliconflow": "https://api.siliconflow.cn/v1",
+    "modelscope": "https://api-inference.modelscope.cn",
+    "ollama": "http://localhost:11434"
   },
   "custom_models": [
     {
@@ -27,14 +37,25 @@
       "name": "MiniMax/MiniMax-M2.5",
       "provider": "custom",
       "api_url": "https://api-inference.modelscope.cn",
-      "api_key": "ms-4eeaabdf-6d4e-47bb-9c63-24492c7abd8f"
+      "api_key": ""
     }
   ],
+  "vl_extractor": {
+    "api_url": "https://api.siliconflow.cn/v1/chat/completions",
+    "api_key": "",
+    "model": "Qwen/Qwen3-VL-30B-A3B-Instruct"
+  },
   "embedding": {
     "provider": "siliconflow",
     "model": "BAAI/bge-large-zh-v1.5",
     "api_url": "https://api.siliconflow.cn/v1",
-    "api_key": "sk-czvdsevxnjscuseffsgmottbrrgssvkuainizcwjeqqbctqc",
+    "api_key": "",
     "dimensions": 1024
+  },
+  "database": {
+    "url": "mysql+pymysql://root:password@localhost:3306/ailearning?charset=utf8mb4"
+  },
+  "jwt": {
+    "secret_key": "change-this-in-production"
   }
 }

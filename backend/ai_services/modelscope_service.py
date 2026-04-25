@@ -2,18 +2,15 @@
 ModelScope服务实现 - 官方免费模型
 API文档: https://www.modelscope.cn/docs
 """
-import os
 import httpx
 import json
 from typing import AsyncGenerator, Dict, List
 from .base import BaseAIService
+from core.app_config import get_api_key, get_api_url
 
 
 class ModelScopeService(BaseAIService):
     """ModelScope服务类，提供官方免费模型供所有用户使用"""
-
-    # 系统内置API Key，从环境变量读取
-    DEFAULT_API_KEY = os.getenv("MODELSCOPE_API_KEY", "ms-4eeaabdf-6d4e-47bb-9c63-24492c7abd8f")
 
     # 支持的模型列表
     AVAILABLE_MODELS = [
@@ -24,12 +21,12 @@ class ModelScopeService(BaseAIService):
         self,
         model_name: str = "MiniMax/MiniMax-M2.5",
         api_key: str = None,
-        api_url: str = "https://api-inference.modelscope.cn",
+        api_url: str = None,
         **kwargs
     ):
-        # 使用系统内置API Key和URL（用户无需配置）
-        effective_api_key = api_key or self.DEFAULT_API_KEY
-        effective_api_url = api_url or "https://api-inference.modelscope.cn"
+        # 从统一配置读取默认值
+        effective_api_key = api_key or get_api_key("modelscope")
+        effective_api_url = api_url or get_api_url("modelscope")
         super().__init__(model_name, effective_api_key, effective_api_url, **kwargs)
 
     async def chat_completion(

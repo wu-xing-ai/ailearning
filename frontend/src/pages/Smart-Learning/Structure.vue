@@ -55,7 +55,7 @@
           </el-alert>
           <el-empty v-if="!loading && !outline && !selectedDocError" description="请选择文档并处理" />
 
-          <template v-else>
+          <template v-else-if="outline">
             <div class="tree-node">
               <div class="node-header">
                 <el-icon><folder /></el-icon>
@@ -85,7 +85,7 @@
             :key="idx"
             class="knowledge-point-card"
           >
-            <div class="kp-text">{{ kp.text }}</div>
+            <div class="kp-text" v-html="renderLatexText(kp.text)"></div>
             <div class="kp-meta" v-if="kp.importance || kp.summary || kp.related_concepts?.length">
               <el-rate v-if="kp.importance" :model-value="kp.importance" disabled size="small" style="margin-right: 8px" />
               <span v-if="kp.summary" class="kp-summary">{{ kp.summary }}</span>
@@ -112,6 +112,7 @@ import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Folder } from '@element-plus/icons-vue'
 import api from '@/utils/api'
+import { renderLatexText } from '@/utils/latex'
 import OutlineNode from '@/views/OutlineNode.vue'
 
 const route = useRoute()

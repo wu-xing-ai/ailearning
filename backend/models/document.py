@@ -19,20 +19,28 @@ class Document(Base):
     created_at = Column(DateTime, server_default=func.now())
     updated_at = Column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    def to_dict(self):
+    def to_dict(self, include_content=False):
         """转换为字典"""
-        content = self.content or ""
-        content_error = None
-        if content.strip().startswith("[处理失败"):
-            content_error = "文档内容异常（上次上传时解析失败），请删除后重新上传"
-        return {
+        result = {
             "id": self.id,
             "filename": self.filename,
             "file_type": self.file_type,
-            "content": content,
-            "content_error": content_error,
             "file_path": self.file_path,
             "processed": self.processed,
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None
         }
+        if include_content:
+            content = self.content or ""
+            content_error = None
+            if content.strip().startswith("[处理失败"):
+                content_error = "文档内容异常（上次上传时解析失败），请删除后重新上传"
+            result["content"] = content
+            result["content_error"] = content_error
+        else:
+            content = self.content or ""
+            if content.strip().startswith("[处理失败"):
+                result["content_error"] = "文档内容异常（上次上传时解析失败），请删除后重新上传"
+            else:
+                result["content_error"] = None
+        return result

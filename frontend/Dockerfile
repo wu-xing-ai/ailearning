@@ -1,16 +1,17 @@
 # syntax=docker/dockerfile:1
-FROM node:20-alpine AS build
+# 用 Debian slim 替代 Alpine，避免 esbuild/vite 原生模块从源码编译
+FROM node:20-slim AS build
 WORKDIR /app
 
+# npm 淘宝镜像加速
 RUN npm config set registry https://registry.npmmirror.com
 
 COPY package*.json ./
 
-# 使用 BuildKit 缓存 npm 下载，不用每次重新拉包
-RUN --mount=type=cache,target=/root/.npm \
-    npm install --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 COPY . .
+ENV NODE_OPTIONS=--max-old-space-size=1024
 RUN npm run build
 
 FROM nginx:alpine

@@ -1,16 +1,13 @@
 """
 数据库配置
 """
-import os
 from sqlalchemy import create_engine, text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker
+from core.app_config import get_database_url
 
-# 数据库连接配置
-DATABASE_URL = os.getenv(
-    "DATABASE_URL",
-    "mysql+pymysql://root:wjx1314520@localhost:3306/ailearning?charset=utf8mb4"
-)
+# 数据库连接配置：从 .env 环境变量优先，其次 config.json
+DATABASE_URL = get_database_url()
 
 # 创建数据库引擎
 engine = create_engine(

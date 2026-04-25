@@ -14,11 +14,9 @@ import json
 import logging
 import httpx
 from typing import Dict, List, Optional
+from core.app_config import load_config, get_embedding_config
 
 logger = logging.getLogger(__name__)
-
-# 配置文件路径
-CONFIG_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "config.json")
 
 # 默认嵌入模型配置
 DEFAULT_EMBEDDING_CONFIG = {
@@ -39,16 +37,17 @@ class EmbeddingService:
     def _load_config(self) -> dict:
         """加载配置文件"""
         try:
-            if os.path.exists(CONFIG_PATH):
-                with open(CONFIG_PATH, "r", encoding="utf-8") as f:
-                    return json.load(f)
+            return load_config()
         except Exception as e:
             logger.warning(f"加载配置文件失败: {e}")
-        return {}
+            return {}
 
     def _get_embedding_config(self) -> dict:
-        """获取嵌入模型配置"""
-        # 优先使用专门的 embedding 配置
+        """获取嵌入模型配置，环境变量优先"""
+        env_cfg = get_embedding_config()
+        if env_cfg.get("api_key"):
+            return env_cfg
+        # 环境变量没配，用 config.json
         if "embedding" in self._config:
             return self._config["embedding"]
 

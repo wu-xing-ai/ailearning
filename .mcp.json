@@ -2,8 +2,13 @@
   "mcpServers": {
     "chrome-devtools": {
       "command": "npx",
-      "args": ["-y", "chrome-devtools-mcp@latest"],
-      "list_network_requests": "allow"
+      "args": [
+        "-y",
+        "chrome-devtools-mcp@latest",
+        "--window-size=1280,800",
+        "--force-device-scale-factor=0.75",
+        "--disable-dev-shm-usage" 
+      ]
     }
   }
 }

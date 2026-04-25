@@ -458,30 +458,100 @@ Content-Type: image/png
 
 ## 配置文件说明
 
-API密钥存储在 `backend/config.json`:
+密钥和敏感配置通过 `backend/.env` 环境变量管理，非敏感配置存储在 `backend/config.json`，统一由 `core/app_config.py` 加载。
+
+### 环境变量 (.env)
+
+复制 `.env.example` 为 `.env` 并填入实际值：
+
+```bash
+# API Keys
+OPENAI_API_KEY=
+ANTHROPIC_API_KEY=
+ZHIPU_API_KEY=
+QWEN_API_KEY=
+SILICONFLOW_API_KEY=
+CUSTOM_API_KEY=
+MODELSCOPE_API_KEY=
+
+# VL Extractor（视觉模型PDF提取）
+VL_API_KEY=
+
+# Embedding（向量嵌入）
+EMBEDDING_API_KEY=
+
+# Database
+DATABASE_URL=mysql+pymysql://root:password@localhost:3306/ailearning?charset=utf8mb4
+
+# JWT
+JWT_SECRET_KEY=change-this-to-a-random-string-in-production
+```
+
+### config.json 结构（非敏感配置）
 
 ```json
 {
-  "provider": "ollama",
-  "model": "qwen2.5",
-  "base_url": "http://localhost:11434",
-  "api_keys": {
-    "openai": "",
-    "anthropic": "",
-    "zhipu": "",
-    "qwen": "",
-    "siliconflow": "",
-    "custom": ""
+  "provider": "当前使用的AI厂商",
+  "model": "当前使用的模型名称",
+  "base_url": "基础URL（可选）",
+
+  "api_keys": { ... },
+
+  "api_urls": {
+    "openai": "https://api.openai.com/v1",
+    "anthropic": "https://api.anthropic.com",
+    "zhipu": "https://open.bigmodel.cn/api/paas/v4",
+    "qwen": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    "siliconflow": "https://api.siliconflow.cn/v1",
+    "modelscope": "https://api-inference.modelscope.cn",
+    "ollama": "http://localhost:11434"
   },
-  "custom_models": [
-    {
-      "name": "模型名称",
-      "provider": "siliconflow",
-      "api_url": "https://api.example.com/v1",
-      "api_key": ""
-    }
-  ]
+
+  "custom_models": [ ... ],
+
+  "vl_extractor": {
+    "api_url": "视觉模型API地址",
+    "model": "视觉模型名称"
+  },
+
+  "embedding": {
+    "provider": "向量嵌入厂商",
+    "model": "嵌入模型名称",
+    "api_url": "嵌入API地址",
+    "dimensions": 1024
+  },
+
+  "database": {
+    "url": "数据库URL（.env优先）"
+  },
+
+  "jwt": {
+    "secret_key": "JWT密钥（.env优先）"
+  }
 }
 ```
 
-> ⚠️ **安全提示**: 请勿将包含真实API密钥的 config.json 提交到版本控制系统。
+### 配置优先级
+
+各服务读取配置的优先级（从高到低）：
+
+1. **`.env` 环境变量** - 如 `DATABASE_URL`、`JWT_SECRET_KEY`、`MODELSCOPE_API_KEY`（推荐方式）
+2. **运行时参数** - API调用时传入的 `apiKey`、`apiUrl`
+3. **config.json** - 作为 `.env` 未配置时的默认值
+
+### 统一配置加载器
+
+`core/app_config.py` 提供以下接口：
+
+| 函数 | 说明 |
+|------|------|
+| `load_config()` | 加载完整配置 |
+| `reload_config()` | 清除缓存重新加载（同时重载 .env） |
+| `get_api_url(provider)` | 获取指定厂商API URL |
+| `get_api_key(provider)` | 获取指定厂商API Key（.env优先） |
+| `get_vl_config()` | 获取视觉模型配置（.env优先） |
+| `get_database_url()` | 获取数据库连接URL（.env优先） |
+| `get_jwt_secret()` | 获取JWT密钥（.env优先） |
+| `get_embedding_api_key()` | 获取Embedding API Key（.env优先） |
+
+> ⚠️ **安全提示**: `.env` 文件已在 `.gitignore` 中排除，请勿提交到版本控制系统。

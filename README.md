@@ -56,6 +56,7 @@ ailearning/
 │   ├── Dockerfile              # 多阶段构建，轻量化部署
 │   │
 │   ├── core/                   # 核心模块
+│   │   ├── app_config.py       # 统一配置加载器
 │   │   ├── config.py           # 配置管理
 │   │   ├── database.py         # 数据库连接
 │   │   └── stream_handler.py   # 流式响应处理
@@ -126,23 +127,36 @@ CREATE DATABASE ailearning CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 
 修改 `backend/core/database.py` 中的数据库连接信息。
 
-#### 3. 配置API密钥
+#### 3. 配置环境变量
 
-编辑 `backend/config.json`，填入你的API密钥：
+复制 `.env.example` 为 `.env` 并填入你的密钥：
 
-```json
-{
-  "provider": "custom",
-  "model": "glm-5.1",
-  "embedding": {
-    "provider": "siliconflow",
-    "model": "BAAI/bge-large-zh-v1.5",
-    "api_url": "https://api.siliconflow.cn/v1",
-    "api_key": "你的SiliconFlow API Key",
-    "dimensions": 1024
-  }
-}
+```bash
+cd backend
+cp .env.example .env
 ```
+
+编辑 `backend/.env`：
+
+```bash
+# API Keys
+SILICONFLOW_API_KEY=你的SiliconFlow API Key
+MODELSCOPE_API_KEY=你的ModelScope API Key
+
+# VL Extractor（视觉模型PDF提取，使用SiliconFlow）
+VL_API_KEY=你的SiliconFlow API Key
+
+# Embedding（向量嵌入）
+EMBEDDING_API_KEY=你的SiliconFlow API Key
+
+# 数据库
+DATABASE_URL=mysql+pymysql://root:密码@localhost:3306/ailearning?charset=utf8mb4
+
+# JWT密钥（生产环境务必更换）
+JWT_SECRET_KEY=change-this-to-a-random-string
+```
+
+> `config.json` 中的 `api_keys`、`vl_extractor`、`embedding`、`database`、`jwt` 字段会作为 `.env` 未配置时的默认值。
 
 #### 4. 启动服务
 

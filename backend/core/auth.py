@@ -1,6 +1,5 @@
 """Authentication utilities: JWT, password hashing, FastAPI dependencies."""
 
-import os
 from datetime import datetime, timedelta
 from typing import List, Optional
 
@@ -10,8 +9,9 @@ from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 
 from core.database import get_db
+from core.app_config import get_jwt_secret
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "ailearning-secret-key-change-in-production-2024")
+SECRET_KEY = get_jwt_secret()
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 1440  # 24 hours
 
