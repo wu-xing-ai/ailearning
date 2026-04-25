@@ -1,7 +1,7 @@
 <template>
   <div class="chat-container">
     <!-- 聊天窗口 -->
-    <div class="chat-window" ref="chatWindowRef">
+    <div class="chat-window" ref="chatWindowRef" @scroll="handleChatScroll">
       <div class="chat-messages">
         <!-- 欢迎消息 -->
         <div v-if="messages.length === 0 && !isLoading" class="welcome-state">
@@ -258,7 +258,9 @@ import { ref, onMounted, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
+import katex from 'katex'
 import 'highlight.js/styles/github-dark.css'
+import 'katex/dist/katex.min.css'
 import api from '../../utils/api'
 
 // 配置 marked
@@ -266,6 +268,55 @@ marked.setOptions({
   breaks: true,
   gfm: true
 })
+
+// LaTeX 公式渲染 - 在 marked 解析前提取保护，解析后渲染
+const renderLatexInHtml = (html) => {
+  // 渲染块级公式 $$...$$
+  html = html.replace(/\$\$([\s\S]*?)\$\$/g, (_, formula) => {
+    try {
+      return katex.renderToString(formula.trim(), {
+        displayMode: true,
+        throwOnError: false,
+      })
+    } catch {
+      return `<code>${formula}</code>`
+    }
+  })
+  // 渲染行内公式 $...$
+  html = html.replace(/\$([^\$\n]+?)\$/g, (_, formula) => {
+    try {
+      return katex.renderToString(formula.trim(), {
+        displayMode: false,
+        throwOnError: false,
+      })
+    } catch {
+      return `<code>${formula}</code>`
+    }
+  })
+  // 兼容 \(...\) 行内公式
+  html = html.replace(/\\\(([\s\S]*?)\\\)/g, (_, formula) => {
+    try {
+      return katex.renderToString(formula.trim(), {
+        displayMode: false,
+        throwOnError: false,
+      })
+    } catch {
+      return `<code>${formula}</code>`
+    }
+  })
+  // 兼容 \[...\] 块级公式
+  html = html.replace(/\\\[([\s\S]*?)\\\]/g, (_, formula) => {
+    try {
+      return katex.renderToString(formula.trim(), {
+        displayMode: true,
+        throwOnError: false,
+      })
+    } catch {
+      return `<code>${formula}</code>`
+    }
+  })
+  return html
+}
 
 const messages = ref([])
 const inputMessage = ref('')
@@ -353,8 +404,43 @@ const ollamaConfig = ref({
 const renderMarkdown = (content) => {
   if (!content) return ''
   try {
-    // 使用 marked 的同步解析
-    let html = marked.parse(content, { async: false })
+    // 先保护 LaTeX 公式不被 marked 破坏
+    const latexBlocks = []
+    let protected_content = content
+
+    // 保护块级公式 $$...$$
+    protected_content = protected_content.replace(/\$\$([\s\S]*?)\$\$/g, (match) => {
+      const idx = latexBlocks.length
+      latexBlocks.push(match)
+      return `%%LATEX_BLOCK_${idx}%%`
+    })
+    // 保护行内公式 $...$
+    protected_content = protected_content.replace(/\$([^\$\n]+?)\$/g, (match) => {
+      const idx = latexBlocks.length
+      latexBlocks.push(match)
+      return `%%LATEX_BLOCK_${idx}%%`
+    })
+    // 保护 \(...\) 行内公式
+    protected_content = protected_content.replace(/\\\(([\s\S]*?)\\\)/g, (match) => {
+      const idx = latexBlocks.length
+      latexBlocks.push(match)
+      return `%%LATEX_BLOCK_${idx}%%`
+    })
+    // 保护 \[...\] 块级公式
+    protected_content = protected_content.replace(/\\\[([\s\S]*?)\\\]/g, (match) => {
+      const idx = latexBlocks.length
+      latexBlocks.push(match)
+      return `%%LATEX_BLOCK_${idx}%%`
+    })
+
+    // 使用 marked 解析
+    let html = marked.parse(protected_content, { async: false })
+
+    // 还原 LaTeX 公式并渲染
+    html = html.replace(/%%LATEX_BLOCK_(\d+)%%/g, (_, idx) => {
+      const original = latexBlocks[parseInt(idx)]
+      return renderLatexInHtml(original)
+    })
 
     // 为代码块添加包装器和复制按钮
     html = html.replace(/<pre><code(?: class="language-(\w+)")?>/g, (match, lang) => {
@@ -370,10 +456,23 @@ const renderMarkdown = (content) => {
   }
 }
 
-// 滚动到底部
+// 用户是否上滑取消了跟随（每次发消息重置）
+const userScrolled = ref(false)
+
+// 监听滚动：用户上滑即取消跟随
+const handleChatScroll = () => {
+  if (!chatWindowRef.value) return
+  const el = chatWindowRef.value
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+  if (!atBottom) {
+    userScrolled.value = true
+  }
+}
+
+// 滚动到底部（仅跟随模式下）
 const scrollToBottom = () => {
   nextTick(() => {
-    if (chatWindowRef.value) {
+    if (chatWindowRef.value && !userScrolled.value) {
       chatWindowRef.value.scrollTop = chatWindowRef.value.scrollHeight
     }
   })
@@ -538,6 +637,7 @@ const sendMessage = async () => {
     timestamp: new Date(),
     status: 'sending'
   })
+  userScrolled.value = false
   scrollToBottom()
 
   // 构造请求
@@ -715,8 +815,19 @@ const formatDate = (date) => {
   })
 }
 
+// 移动端：动态设置header高度CSS变量，确保聊天容器精确填满剩余视口
+const updateHeaderHeight = () => {
+  const header = document.querySelector('.header')
+  if (header && window.innerWidth <= 768) {
+    document.documentElement.style.setProperty('--header-height', header.offsetHeight + 'px')
+  }
+}
+
 // 初始化
 onMounted(async () => {
+  updateHeaderHeight()
+  window.addEventListener('resize', updateHeaderHeight)
+
   // 加载Ollama模型
   await refreshOllamaModels()
 
@@ -1548,5 +1659,103 @@ if (typeof window !== 'undefined') {
 .no-key-required svg {
   width: 18px;
   height: 18px;
+}
+
+/* ========== 移动端响应式 ========== */
+@media (max-width: 768px) {
+  /* 移动端：聊天容器精确填满剩余视口，避免页面级滚动 */
+  .chat-container {
+    height: calc(100dvh - var(--header-height, 73px) - 16px);
+    border-radius: 0;
+    box-shadow: none;
+  }
+
+  .chat-window {
+    padding: 12px 8px;
+    flex: 1;
+    min-height: 0;
+  }
+
+  .welcome-state {
+    padding: 20px 12px;
+  }
+
+  .welcome-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 14px;
+    margin-bottom: 12px;
+  }
+
+  .welcome-icon svg {
+    width: 24px;
+    height: 24px;
+  }
+
+  .welcome-state h2 {
+    font-size: 20px;
+    margin-bottom: 4px;
+  }
+
+  .welcome-state p {
+    font-size: 14px;
+    margin-bottom: 16px;
+  }
+
+  .quick-actions {
+    gap: 8px;
+  }
+
+  .quick-btn {
+    padding: 8px 14px;
+    font-size: 13px;
+  }
+
+  .chat-input {
+    padding: 10px 10px;
+    padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+    flex-shrink: 0;
+  }
+
+  .input-wrapper :deep(.el-textarea__inner) {
+    padding: 8px 10px;
+    font-size: 14px;
+  }
+
+  .input-hint {
+    display: none;
+  }
+
+  .input-actions {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .model-selector {
+    width: 100%;
+  }
+
+  .model-selector :deep(.el-select) {
+    flex: 1;
+    width: auto;
+  }
+
+  .action-buttons {
+    width: 100%;
+    justify-content: flex-end;
+  }
+
+  .send-btn {
+    flex: 1;
+  }
+
+  .message {
+    max-width: 92%;
+  }
+
+  .message-bubble {
+    padding: 10px 14px;
+    font-size: 14px;
+  }
 }
 </style>

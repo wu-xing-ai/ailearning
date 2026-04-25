@@ -26,15 +26,19 @@ EXTRACT_PROMPT = (
 )
 
 
-def _render_page_to_base64(doc: fitz.Document, page_index: int, dpi: int = 150) -> str:
-    """将PDF指定页面渲染为base64编码的PNG图片（复用已打开的doc）"""
+def _render_page_to_base64(doc: fitz.Document, page_index: int, dpi: int = 100) -> str:
+    """将PDF指定页面渲染为base64编码的JPEG图片（复用已打开的doc）"""
     if page_index >= len(doc):
         page_index = len(doc) - 1
     page = doc[page_index]
     mat = fitz.Matrix(dpi / 72, dpi / 72)
     pix = page.get_pixmap(matrix=mat)
-    img_bytes = pix.tobytes("png")
-    return base64.b64encode(img_bytes).decode("utf-8")
+    # 使用JPEG格式减小base64体积（约减少70%）
+    img_bytes = pix.tobytes("jpeg", jpg_quality=75)
+    result = base64.b64encode(img_bytes).decode("utf-8")
+    # 及时释放pixmap内存
+    pix = None
+    return result
 
 
 def _call_vl_model(image_base64: str, prompt: str) -> str:
@@ -105,8 +109,9 @@ def extract_pdf_with_vl(pdf_bytes: bytes) -> str:
 def extract_scanned_pdf_with_vl(pdf_bytes: bytes) -> str:
     """对扫描版PDF使用VL模型提取内容（从bytes）
 
-    策略：均匀选取5个页面进行识别。
+    策略：均匀选取最多5个页面进行识别。
     """
+    import gc
     doc = fitz.open(stream=pdf_bytes, filetype="pdf")
     try:
         total_pages = len(doc)
@@ -131,6 +136,9 @@ def extract_scanned_pdf_with_vl(pdf_bytes: bytes) -> str:
                 text = _call_vl_model(image_b64, EXTRACT_PROMPT)
                 if text.strip():
                     all_text.append(f"--- 第{idx + 1}页 ---\n{text}")
+                # 及时释放base64图片内存
+                del image_b64
+                gc.collect()
                 time.sleep(2)
             except Exception as e:
                 logger.warning(f"VL第{idx + 1}页提取失败: {e}")
@@ -141,6 +149,7 @@ def extract_scanned_pdf_with_vl(pdf_bytes: bytes) -> str:
         return result
     finally:
         doc.close()
+        gc.collect()
 
 
 def extract_pdf_with_vl_from_path(file_path: str) -> str:
@@ -166,6 +175,7 @@ def extract_pdf_with_vl_from_path(file_path: str) -> str:
 
 def extract_scanned_pdf_with_vl_from_path(file_path: str) -> str:
     """从文件路径提取扫描版PDF（直接打开文件，不读入内存）"""
+    import gc
     doc = fitz.open(file_path)
     try:
         total_pages = len(doc)
@@ -190,6 +200,8 @@ def extract_scanned_pdf_with_vl_from_path(file_path: str) -> str:
                 text = _call_vl_model(image_b64, EXTRACT_PROMPT)
                 if text.strip():
                     all_text.append(f"--- 第{idx + 1}页 ---\n{text}")
+                del image_b64
+                gc.collect()
                 time.sleep(2)
             except Exception as e:
                 logger.warning(f"VL第{idx + 1}页提取失败: {e}")
@@ -200,3 +212,4 @@ def extract_scanned_pdf_with_vl_from_path(file_path: str) -> str:
         return result
     finally:
         doc.close()
+        gc.collect()

@@ -226,6 +226,7 @@ class EmbeddingService:
         if not chunks:
             return 0
 
+        import gc
         from core.database import get_db
         from models.embedding import EmbeddingVector
 
@@ -234,28 +235,40 @@ class EmbeddingService:
             # 删除旧的嵌入向量
             db.query(EmbeddingVector).filter(EmbeddingVector.doc_id == doc_id).delete()
 
-            # 生成嵌入向量
+            # 分批生成嵌入向量（每批5个，避免内存爆）
+            batch_size = 5
+            indexed_count = 0
             texts = [ch.text for ch in chunks]
-            embeddings = self.generate_embeddings_batch(texts)
 
-            if not embeddings:
-                logger.warning(f"文档 {doc_id} 生成嵌入向量失败，跳过索引")
-                return 0
+            for i in range(0, len(texts), batch_size):
+                batch_texts = texts[i:i + batch_size]
+                batch_chunks = chunks[i:i + batch_size]
+                embeddings = self.generate_embeddings_batch(batch_texts)
 
-            # 存储到数据库
-            for i, (ch, embedding) in enumerate(zip(chunks, embeddings)):
-                vector_record = EmbeddingVector(
-                    id=f"{doc_id}_{ch.index}",
-                    doc_id=doc_id,
-                    chunk_index=ch.index,
-                    text=ch.text[:500],  # 只存储前 500 字符作为预览
-                    embedding=json.dumps(embedding),
-                )
-                db.add(vector_record)
+                if not embeddings:
+                    logger.warning(f"文档 {doc_id} 第{i}批嵌入向量生成失败，跳过")
+                    continue
 
-            db.commit()
-            logger.info(f"文档 {doc_id} 索引了 {len(chunks)} 个块")
-            return len(chunks)
+                # 逐条写入数据库
+                for ch, embedding in zip(batch_chunks, embeddings):
+                    vector_record = EmbeddingVector(
+                        id=f"{doc_id}_{ch.index}",
+                        doc_id=doc_id,
+                        chunk_index=ch.index,
+                        text=ch.text[:500],  # 只存储前 500 字符作为预览
+                        embedding=json.dumps(embedding),
+                    )
+                    db.add(vector_record)
+                    indexed_count += 1
+
+                db.commit()
+                # 每批处理完回收内存
+                del embeddings
+                del batch_texts
+                gc.collect()
+
+            logger.info(f"文档 {doc_id} 索引了 {indexed_count} 个块")
+            return indexed_count
 
         except Exception as e:
             db.rollback()
@@ -277,15 +290,13 @@ class EmbeddingService:
         """
         from core.database import get_db
         from models.embedding import EmbeddingVector
-        import numpy as np
 
         try:
             # 生成查询向量
-            query_embedding = self.generate_embedding(query)
-            if query_embedding is None:
+            query_vec = self.generate_embedding(query)
+            if query_vec is None:
                 logger.warning("生成查询向量失败，返回空结果")
                 return []
-            query_embedding = np.array(query_embedding)
 
             db = next(get_db())
             try:
@@ -299,12 +310,19 @@ class EmbeddingService:
                 if not vectors:
                     return []
 
-                # 计算余弦相似度
+                # 分批计算余弦相似度，避免一次性加载所有向量到numpy
                 results = []
+                query_norm = sum(x * x for x in query_vec) ** 0.5
+
                 for v in vectors:
-                    vec = np.array(json.loads(v.embedding))
-                    # 余弦相似度
-                    similarity = np.dot(query_embedding, vec) / (np.linalg.norm(query_embedding) * np.linalg.norm(vec))
+                    vec = json.loads(v.embedding)
+                    # 纯Python计算余弦相似度，避免numpy大数组占用内存
+                    dot_product = sum(a * b for a, b in zip(query_vec, vec))
+                    vec_norm = sum(x * x for x in vec) ** 0.5
+                    if vec_norm > 0:
+                        similarity = dot_product / (query_norm * vec_norm)
+                    else:
+                        similarity = 0
 
                     results.append({
                         "chunk_id": v.id,

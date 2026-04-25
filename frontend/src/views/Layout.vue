@@ -346,9 +346,9 @@ const handleLogout = () => {
 /* ========== 主内容区 ========== */
 .main-content {
   flex: 1;
+  min-height: 0;
   padding: 24px;
   background: linear-gradient(180deg, #FFFEF7 0%, #F8F6F1 100%);
-  min-height: 0;
 }
 
 /* ========== 页面切换动画 ========== */
@@ -522,7 +522,10 @@ const handleLogout = () => {
   }
 
   .main-content {
-    padding: 12px;
+    padding: 8px;
+    overflow: hidden;
+    flex: 1;
+    min-height: 0;
   }
 }
 </style>

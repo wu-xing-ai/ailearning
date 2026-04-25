@@ -173,8 +173,8 @@ def save_custom_models(models):
     with open(CUSTOM_MODELS_FILE, "w", encoding="utf-8") as f:
         json.dump(models, f, ensure_ascii=False, indent=2)
 
-# 线程池用于异步处理文件
-file_executor = ThreadPoolExecutor(max_workers=4)
+# 线程池用于异步处理文件（2核服务器限制为1个worker避免内存爆）
+file_executor = ThreadPoolExecutor(max_workers=1)
 
 # 启动时初始化数据库
 @app.on_event("startup")
@@ -208,11 +208,15 @@ async def health_check():
 
 def _process_file_background(doc_id: str, filename: str, file_type: str, file_path: str):
     """后台处理文件：提取文本并更新数据库"""
+    import gc
     db = next(get_db())
     try:
         text_content, file_type_name = DocumentProcessor.extract_from_file(
             file_path, file_type, filename
         )
+        # 提取完成后立即回收内存
+        gc.collect()
+
         document = DocumentModel(
             id=doc_id,
             filename=filename,
@@ -293,24 +297,37 @@ async def upload_document(file: UploadFile = File(...), background_tasks: Backgr
     if file_type == 'unknown':
         raise HTTPException(status_code=400, detail="不支持的文件格式，仅支持 PDF、DOCX、TXT、XLSX、MD")
 
-    # 2. 生成文档ID
+    # 2. 限制文件大小（50MB）
+    MAX_FILE_SIZE = 50 * 1024 * 1024  # 50MB
+
+    # 3. 生成文档ID
     doc_id = str(uuid.uuid4())
 
-    # 3. 流式保存文件到磁盘（避免一次性读取大文件撑爆内存）
+    # 4. 流式保存文件到磁盘（避免一次性读取大文件撑爆内存）
     knowledge_base_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), "knowledge_base")
     doc_dir = os.path.join(knowledge_base_dir, doc_id)
     os.makedirs(doc_dir, exist_ok=True)
 
     file_path = os.path.join(doc_dir, filename)
+    total_size = 0
     with open(file_path, "wb") as f:
         chunk_size = 1024 * 1024  # 1MB
         while True:
             chunk = await file.read(chunk_size)
             if not chunk:
                 break
+            total_size += len(chunk)
+            if total_size > MAX_FILE_SIZE:
+                # 超过大小限制，删除已写入的文件
+                f.close()
+                if os.path.exists(file_path):
+                    os.remove(file_path)
+                if os.path.exists(doc_dir):
+                    os.rmdir(doc_dir)
+                raise HTTPException(status_code=400, detail="文件大小超过50MB限制")
             f.write(chunk)
 
-    # 4. 后台异步处理文件提取和数据库写入（从磁盘读取，不占请求内存）
+    # 5. 后台异步处理文件提取和数据库写入（从磁盘读取，不占请求内存）
     background_tasks.add_task(
         _process_file_background, doc_id, filename, file_type, file_path
     )
@@ -863,6 +880,10 @@ async def process_knowledge(
 
         chunks, outline, points = build_structure(document.content, document.filename)
 
+        # 结构化完成后释放文档内容占用的临时内存
+        import gc
+        gc.collect()
+
         has_content = bool(outline.get("children")) or bool(points)
 
         for ch in chunks:
@@ -1014,6 +1035,10 @@ async def process_knowledge_ai(request: dict):
         chunks, outline, points = await build_ai_structure(
             service, document.content, document.filename
         )
+
+        # AI结构化完成后释放临时内存
+        import gc
+        gc.collect()
 
         has_content = bool(outline.get("children")) or bool(points)
 
