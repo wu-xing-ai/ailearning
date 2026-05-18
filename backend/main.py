@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File, BackgroundTasks
+from fastapi import FastAPI, HTTPException, Depends, Query, UploadFile, File, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse, Response
 from pydantic import BaseModel
@@ -28,6 +28,8 @@ from services.ai_knowledge_processor import STRUCTURE_VERSION_AI, PROMPT_VERSION
 from services.embedding_service import embedding_service
 from services.hybrid_search import hybrid_search
 from services.progress_service import ProgressService
+from services.quiz_service import QuizService
+from models.quiz import QuizQuestion, QuizAttempt
 from models.user import User as UserModel
 from models.chat_session import ChatSessionDB, ChatMessageDB
 from core.auth import (
@@ -1067,6 +1069,13 @@ async def process_knowledge_ai(request: dict):
         document.processed = has_content
         db.commit()
 
+        # Auto-generate quiz questions from knowledge points
+        try:
+            quiz_svc = QuizService(db)
+            await quiz_svc.generate_quizzes(service, doc_id, ai_model_label)
+        except Exception as e:
+            print(f"[自动出题] 生成题目失败（不影响文档处理）: {e}")
+
         return {
             "status": "processed" if has_content else "empty",
             "document_id": doc_id,
@@ -1426,6 +1435,148 @@ async def end_study_session(request: dict, user=Depends(require_auth)):
         if not s:
             raise HTTPException(status_code=404, detail="会话不存在")
         return {"duration_seconds": s.duration_seconds}
+    finally:
+        db.close()
+
+
+@app.post("/api/progress/session/beacon")
+async def end_study_session_bacon(request: Request):
+    """Beacon端点 - 页面卸载时可靠结束学习会话（sendBeacon不带JWT）"""
+    try:
+        body = await request.body()
+        data = json.loads(body)
+        session_id = data.get("session_id")
+    except Exception:
+        form = await request.form()
+        session_id = form.get("session_id")
+    if not session_id:
+        return Response(status_code=204)
+    db = next(get_db())
+    try:
+        svc = ProgressService(db)
+        svc.end_study_session(session_id)
+    except Exception:
+        pass
+    finally:
+        db.close()
+    return Response(status_code=204)
+
+
+# ==================== 做题练习端点 ====================
+
+@app.post("/api/quizzes/generate")
+async def generate_quizzes(request: dict, user=Depends(require_auth)):
+    """手动触发生成题目"""
+    doc_id = request.get("doc_id")
+    if not doc_id:
+        raise HTTPException(status_code=400, detail="doc_id不能为空")
+
+    provider = request.get("provider", "modelscope")
+    model_name = request.get("model_name", "MiniMax/MiniMax-M2.5")
+    force = request.get("force", False)
+
+    db = next(get_db())
+    try:
+        # Create AI service - fallback chain: requested provider -> modelscope
+        service = None
+        try:
+            if provider == "ollama" and ollama_service:
+                service = ollama_service
+                if model_name != service.model_name:
+                    from ollama_service import OllamaService as _OS
+                    service = _OS(model_name=model_name, base_url=ollama_config.base_url)
+            elif provider == "custom":
+                service = factory.create_service(
+                    provider="custom", model_name=model_name,
+                    api_key=request.get("api_key"), api_url=request.get("api_url"),
+                )
+            else:
+                api_key = request.get("api_key") or api_keys_storage.get(provider)
+                service = factory.create_service(
+                    provider=provider, model_name=model_name, api_key=api_key,
+                )
+        except Exception:
+            pass  # Will try fallback below
+
+        # Fallback to modelscope free model
+        if not service:
+            try:
+                provider = "modelscope"
+                model_name = "MiniMax/MiniMax-M2.5"
+                service = factory.create_service(provider="modelscope", model_name=model_name)
+            except Exception as e:
+                raise HTTPException(status_code=400, detail=f"AI服务不可用: {str(e)}")
+
+        # Check if document has knowledge points
+        structure = db.query(DocumentStructure).filter(DocumentStructure.document_id == doc_id).first()
+        if not structure or not structure.knowledge_points_json:
+            raise HTTPException(status_code=400, detail="该文档暂无知识点，请先进行AI智能处理")
+
+        ai_model_label = f"{provider}/{model_name}"
+        svc = QuizService(db)
+        count = await svc.generate_quizzes(service, doc_id, ai_model_label, force=force)
+        if count == 0:
+            raise HTTPException(status_code=500, detail="AI未能生成题目，请稍后重试")
+        return {"status": "generated", "count": count}
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"生成题目失败: {str(e)}")
+    finally:
+        db.close()
+
+
+@app.get("/api/quizzes/documents")
+async def get_quiz_documents(user=Depends(require_auth)):
+    """获取有题目的文档列表"""
+    db = next(get_db())
+    try:
+        svc = QuizService(db)
+        return JSONResponse(
+            content=svc.get_documents_with_quizzes(user.id),
+            media_type="application/json; charset=utf-8",
+        )
+    finally:
+        db.close()
+
+
+@app.get("/api/quizzes/document/{doc_id}")
+async def get_document_quizzes(doc_id: str, user=Depends(require_auth)):
+    """获取文档的题目"""
+    db = next(get_db())
+    try:
+        svc = QuizService(db)
+        return JSONResponse(
+            content=svc.get_quizzes_by_document(doc_id, user.id),
+            media_type="application/json; charset=utf-8",
+        )
+    finally:
+        db.close()
+
+
+@app.post("/api/quizzes/answer")
+async def submit_quiz_answer(request: dict, user=Depends(require_auth)):
+    """提交答案"""
+    quiz_question_id = request.get("quiz_question_id")
+    selected_index = request.get("selected_index")
+    if quiz_question_id is None or selected_index is None:
+        raise HTTPException(status_code=400, detail="quiz_question_id和selected_index不能为空")
+
+    db = next(get_db())
+    try:
+        svc = QuizService(db)
+        return svc.submit_answer(user.id, quiz_question_id, selected_index)
+    finally:
+        db.close()
+
+
+@app.get("/api/quizzes/stats/{doc_id}")
+async def get_quiz_stats(doc_id: str, user=Depends(require_auth)):
+    """获取题目统计"""
+    db = next(get_db())
+    try:
+        svc = QuizService(db)
+        return svc.get_quiz_stats(user.id, doc_id)
     finally:
         db.close()
 

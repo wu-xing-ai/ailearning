@@ -61,7 +61,7 @@
 </template>
 
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onBeforeUnmount } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Search } from '@element-plus/icons-vue'
 import api from '@/utils/api'
@@ -71,6 +71,7 @@ const searchMode = ref('keyword')
 const searching = ref(false)
 const hasSearched = ref(false)
 const searchResults = ref([])
+let searchSessionId = null
 
 const searchModeOptions = [
   { label: '关键词', value: 'keyword' },
@@ -123,6 +124,16 @@ const performSearch = async () => {
   searching.value = true
   hasSearched.value = true
 
+  // 开始搜索学习会话
+  if (!searchSessionId) {
+    try {
+      const res = await api.startStudySession(null, 'search')
+      searchSessionId = res.session_id
+    } catch (e) {
+      // 静默处理
+    }
+  }
+
   try {
     if (searchMode.value === 'keyword') {
       const response = await fetch(`/api/documents/search?q=${encodeURIComponent(searchQuery.value.trim())}`)
@@ -143,6 +154,13 @@ const performSearch = async () => {
     searching.value = false
   }
 }
+
+onBeforeUnmount(() => {
+  if (searchSessionId) {
+    api.beaconEndStudySession(searchSessionId)
+    searchSessionId = null
+  }
+})
 </script>
 
 <style scoped>

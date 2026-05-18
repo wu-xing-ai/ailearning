@@ -133,7 +133,7 @@
                   :key="idx"
                   class="point-card"
                   :class="{ active: activePointIdx === idx }"
-                  @click="activePointIdx = idx"
+                  @click="onPointClick(idx)"
                 >
                   <el-tag :type="pointTagType(kp.type)" size="small" effect="plain">{{ pointTypeLabel(kp.type) }}</el-tag>
                   <span class="point-text" v-html="renderLatexText(kp.text)"></span>
@@ -208,7 +208,7 @@
 </template>
 
 <script setup>
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { ElMessage } from 'element-plus'
 import { Folder, ZoomIn, Document, Tickets, Notebook, Reading } from '@element-plus/icons-vue'
@@ -232,6 +232,9 @@ const activePointIdx = ref(-1)
 const aiDialogVisible = ref(false)
 const aiProvider = ref('modelscope')
 const aiModelName = ref('MiniMax/MiniMax-M2.5')
+
+// 学习进度追踪
+let studySessionId = null
 
 // AI厂商默认模型映射
 const aiProviderModels = {
@@ -364,6 +367,14 @@ const loadStructure = async () => {
     knowledgePoints.value = res.knowledge_points || []
     version.value = res.version
     await syncRouteDocId(selectedDocId.value)
+
+    // 开始学习会话
+    try {
+      const sessionRes = await api.startStudySession(selectedDocId.value, 'knowledge_review')
+      studySessionId = sessionRes.session_id
+    } catch (e) {
+      // 会话记录失败不影响页面功能
+    }
   } catch (e) {
     outline.value = null
     knowledgePoints.value = []
@@ -412,6 +423,19 @@ const onSelectNode = (path) => {
   activePointIdx.value = -1
 }
 
+const onPointClick = async (idx) => {
+  activePointIdx.value = idx
+  // 记录知识点掌握度
+  const point = selectedPoints.value[idx]
+  if (point && selectedDocId.value) {
+    try {
+      await api.updateMastery(selectedDocId.value, point.text, 0.1)
+    } catch (e) {
+      // 掌握度记录失败不影响交互
+    }
+  }
+}
+
 const resetSelection = () => {
   selectedPath.value = []
   activePointIdx.value = -1
@@ -434,6 +458,13 @@ onMounted(async () => {
   await loadDocuments()
   if (selectedDocId.value) {
     await loadStructure()
+  }
+})
+
+onBeforeUnmount(() => {
+  if (studySessionId) {
+    api.beaconEndStudySession(studySessionId)
+    studySessionId = null
   }
 })
 </script>

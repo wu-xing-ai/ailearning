@@ -12,6 +12,18 @@ async function parseResponse(response) {
   return { detail: text || '请求失败' }
 }
 
+function handleAuthError(response) {
+  if (response.status === 401) {
+    localStorage.removeItem('auth_token')
+    localStorage.removeItem('auth_user')
+    if (window.location.pathname !== '/login') {
+      window.location.href = '/login'
+    }
+    return true
+  }
+  return false
+}
+
 function getAuthHeaders() {
   const token = localStorage.getItem('auth_token')
   if (token) {
@@ -60,9 +72,19 @@ const api = {
       return response
     }
 
+    // 处理流式响应
+    if (options.responseType === 'stream') {
+      if (response.status === 401) {
+        handleAuthError(response)
+        throw new Error('登录已过期，请重新登录')
+      }
+      return response
+    }
+
     const result = await parseResponse(response)
 
     if (!response.ok) {
+      handleAuthError(response)
       throw new Error(result.detail || result.error || '请求失败')
     }
 
@@ -75,6 +97,7 @@ const api = {
     const result = await parseResponse(response)
 
     if (!response.ok) {
+      handleAuthError(response)
       throw new Error(result.detail || result.error || '请求失败')
     }
 
@@ -192,6 +215,32 @@ const api = {
   },
   async endStudySession(sessionId) {
     return this.post('/api/progress/session/end', { session_id: sessionId })
+  },
+  beaconEndStudySession(sessionId) {
+    if (!sessionId) return
+    const blob = new Blob([JSON.stringify({ session_id: sessionId })], { type: 'application/json' })
+    navigator.sendBeacon('/api/progress/session/beacon', blob)
+  },
+
+  // 做题练习
+  async getQuizDocuments() {
+    return this.get('/api/quizzes/documents')
+  },
+  async getDocumentQuizzes(docId) {
+    return this.get(`/api/quizzes/document/${docId}`)
+  },
+  async generateQuizzes(docId, provider = 'modelscope', modelName = 'MiniMax/MiniMax-M2.5', force = false) {
+    return this.post('/api/quizzes/generate', {
+      doc_id: docId, provider, model_name: modelName, force
+    })
+  },
+  async submitQuizAnswer(quizQuestionId, selectedIndex) {
+    return this.post('/api/quizzes/answer', {
+      quiz_question_id: quizQuestionId, selected_index: selectedIndex
+    })
+  },
+  async getQuizStats(docId) {
+    return this.get(`/api/quizzes/stats/${docId}`)
   }
 }
 

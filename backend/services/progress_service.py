@@ -1,6 +1,6 @@
 """Progress tracking business logic."""
 
-from datetime import datetime
+from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 
 from models.learning_progress import LearningProgress
@@ -8,6 +8,7 @@ from models.knowledge_mastery import KnowledgeMastery
 from models.study_session import StudySession
 from models.document import Document as DocumentModel
 from models.document_chunk import DocumentChunk
+from models.quiz import QuizQuestion, QuizAttempt
 
 
 class ProgressService:
@@ -96,8 +97,15 @@ class ProgressService:
             LearningProgress.user_id == user_id,
         ).all()
 
-        total_time = sum(p.time_spent_seconds or 0 for p in progresses)
         completed = sum(1 for p in progresses if p.status == "completed")
+
+        # All sessions for this user
+        all_sessions = self.db.query(StudySession).filter(
+            StudySession.user_id == user_id,
+        ).all()
+
+        # Total time: sum of all completed study sessions
+        total_time = sum(s.duration_seconds or 0 for s in all_sessions if s.duration_seconds)
 
         # Mastery summary
         masteries = self.db.query(KnowledgeMastery).filter(
@@ -112,6 +120,32 @@ class ProgressService:
             StudySession.user_id == user_id,
         ).order_by(StudySession.started_at.desc()).limit(10).all()
 
+        # Daily stats - past 7 days
+        daily_stats = []
+        today = datetime.now().date()
+        for i in range(6, -1, -1):
+            day = today - timedelta(days=i)
+            day_start = datetime.combine(day, datetime.min.time())
+            day_end = datetime.combine(day, datetime.max.time())
+            day_sessions = [s for s in all_sessions
+                           if s.started_at and day_start <= s.started_at <= day_end]
+            day_seconds = sum(s.duration_seconds or 0 for s in day_sessions)
+            daily_stats.append({
+                "date": day.isoformat(),
+                "minutes": round(day_seconds / 60, 1),
+            })
+
+        # Streak days
+        streak_days = 0
+        check_date = today
+        session_dates = set()
+        for s in all_sessions:
+            if s.started_at:
+                session_dates.add(s.started_at.date())
+        while check_date in session_dates:
+            streak_days += 1
+            check_date -= timedelta(days=1)
+
         # Documents progress with filenames
         doc_progresses = []
         for p in progresses:
@@ -125,12 +159,22 @@ class ProgressService:
                 "last_accessed_at": p.last_accessed_at.isoformat() if p.last_accessed_at else None,
             })
 
+        # Quiz stats - count all questions and attempts for this user
+        total_quiz_questions = self.db.query(QuizQuestion).count()
+        total_answered = self.db.query(QuizAttempt).filter(QuizAttempt.user_id == user_id).count()
+        total_correct = self.db.query(QuizAttempt).filter(
+            QuizAttempt.user_id == user_id, QuizAttempt.is_correct == True
+        ).count()
+
         return {
             "total_documents": len(progresses),
             "completed_documents": completed,
             "total_time_seconds": total_time,
             "documents_progress": doc_progresses,
             "mastery_summary": {"high": high, "medium": medium, "low": low},
+            "total_knowledge_points": len(masteries),
+            "streak_days": streak_days,
+            "daily_stats": daily_stats,
             "recent_sessions": [
                 {
                     "id": s.id, "document_id": s.document_id,
@@ -140,6 +184,11 @@ class ProgressService:
                 }
                 for s in sessions
             ],
+            "quiz_stats": {
+                "total": total_quiz_questions,
+                "answered": total_answered,
+                "correct": total_correct,
+            },
         }
 
     def get_document_progress(self, user_id: str, doc_id: str) -> Dict:

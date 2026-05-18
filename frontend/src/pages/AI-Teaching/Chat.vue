@@ -254,7 +254,7 @@
 </template>
 
 <script setup>
-import { ref, onMounted, computed, nextTick } from 'vue'
+import { ref, onMounted, onBeforeUnmount, computed, nextTick } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
 import { marked } from 'marked'
 import hljs from 'highlight.js'
@@ -324,6 +324,7 @@ const isLoading = ref(false)
 const isWaitingForResponse = ref(false)
 const chatWindowRef = ref(null)
 let messageIdCounter = 0
+let chatSessionId = null
 
 // 厂商和模型选择
 const providers = ref([
@@ -640,6 +641,16 @@ const sendMessage = async () => {
   userScrolled.value = false
   scrollToBottom()
 
+  // 开始学习会话（首次发送消息时）
+  if (!chatSessionId) {
+    try {
+      const res = await api.startStudySession(null, 'chat')
+      chatSessionId = res.session_id
+    } catch (e) {
+      // 静默处理
+    }
+  }
+
   // 构造请求
   let requestConfig = {
     type: selectedProvider.value,
@@ -873,6 +884,13 @@ onMounted(async () => {
 
   if (modelLists.value.modelscope.length > 0) {
     selectedModel.value = modelLists.value.modelscope[0].value
+  }
+})
+
+onBeforeUnmount(() => {
+  if (chatSessionId) {
+    api.beaconEndStudySession(chatSessionId)
+    chatSessionId = null
   }
 })
 

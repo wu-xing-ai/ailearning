@@ -60,6 +60,12 @@ const routes = [
         meta: { title: '知识库管理', requiresAuth: true }
       },
       {
+        path: 'quiz',
+        name: 'Quiz',
+        component: () => import('../pages/Smart-Learning/Quiz.vue'),
+        meta: { title: '做题练习', requiresAuth: true }
+      },
+      {
         path: 'progress',
         name: 'Progress',
         component: () => import('../pages/Dashboard/ProgressDashboard.vue'),
