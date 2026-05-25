@@ -5,7 +5,7 @@ services:
     container_name: ailearning-mysql
     restart: unless-stopped
     environment:
-      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ailearning123}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-ailearn123}
       MYSQL_DATABASE: ailearning
       MYSQL_CHARACTER_SET_SERVER: utf8mb4
       MYSQL_COLLATION_SERVER: utf8mb4_unicode_ci
@@ -30,7 +30,7 @@ services:
       DATABASE_URL: mysql+pymysql://root:${MYSQL_ROOT_PASSWORD:-ailearning123}@mysql:3306/ailearning?charset=utf8mb4
       DOCKER_ENV: "true"
       OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://host.docker.internal:11434}
-      MODELSCOPE_API_KEY: ${MODELSCOPE_API_KEY:-ms-2b5b0597-8850-41a7-8d9b-fca0489a9f97}
+      MODELSCOPE_API_KEY: ${MODELSCOPE_API_KEY:-ms-2b5b0597-8850-41a7-8d9b-fca0f97}
     volumes:
       - ./backend/knowledge_base:/app/knowledge_base
       - ./backend/chroma_data:/app/chroma_data
